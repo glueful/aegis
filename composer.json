@@ -31,7 +31,7 @@
             "name": "Aegis",
             "displayName": "Aegis",
             "description": "Modern, hierarchical role-based access control system",
-            "version": "1.1.0",
+            "version": "1.1.1",
             "icon": "assets/icon.png",
             "galleryBanner": {
                 "color": "#2563EB",
@@ -41,7 +41,7 @@
             "publisher": "glueful-team",
             "provider": "Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider",
             "requires": {
-                "glueful": ">=1.0.0",
+                "glueful": ">=1.5.0",
                 "extensions": []
             }
         }
