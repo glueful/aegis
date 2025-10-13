@@ -70,12 +70,14 @@ class AegisServiceProvider extends ServiceProvider
                 'enable_inheritance' => $config['permissions']['inheritance_enabled'] ?? true,
                 'max_hierarchy_depth' => $config['roles']['max_hierarchy_depth'] ?? 10,
             ];
-            $provider->initialize($providerConfig);
 
             if ($this->app->has('permission.manager')) {
                 $manager = $this->app->get('permission.manager');
                 $manager->registerProviders(['rbac' => $provider]);
                 $manager->setProvider($provider, $providerConfig);
+            } else {
+                // Guard: log and defer when permission manager is not yet available
+                error_log('[Aegis] permission.manager not available during boot; deferring provider setup');
             }
         } catch (\Exception $e) {
             error_log('Aegis: Failed to initialize permission provider: ' . $e->getMessage());
