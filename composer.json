@@ -16,6 +16,7 @@
         "phpunit/phpunit": "^10.0",
         "phpstan/phpstan": "^1.10"
     },
+    "homepage": "https://github.com/glueful/aegis",
     "autoload": {
         "psr-4": {
             "Glueful\\Extensions\\Aegis\\": "src/"
@@ -41,7 +42,7 @@
             "publisher": "glueful-team",
             "provider": "Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider",
             "requires": {
-                "glueful": ">=1.5.0",
+                "glueful": ">=1.6.2",
                 "extensions": []
             }
         }
