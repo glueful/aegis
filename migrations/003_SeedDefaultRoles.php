@@ -51,7 +51,7 @@ class SeedDefaultRoles implements MigrationInterface
                 'slug' => 'superuser',
                 'description' => 'System administrator with full access',
                 'level' => 100,
-                'is_system' => 1,
+                'is_system' => true,
                 'status' => 'active'
             ],
             'administrator' => [
@@ -59,7 +59,7 @@ class SeedDefaultRoles implements MigrationInterface
                 'slug' => 'administrator',
                 'description' => 'Site administrator with management access',
                 'level' => 80,
-                'is_system' => 1,
+                'is_system' => true,
                 'status' => 'active'
             ],
             'manager' => [
@@ -67,7 +67,7 @@ class SeedDefaultRoles implements MigrationInterface
                 'slug' => 'manager',
                 'description' => 'User manager with limited admin access',
                 'level' => 60,
-                'is_system' => 1,
+                'is_system' => true,
                 'status' => 'active'
             ],
             'user' => [
@@ -75,7 +75,7 @@ class SeedDefaultRoles implements MigrationInterface
                 'slug' => 'user',
                 'description' => 'Standard user with basic access',
                 'level' => 10,
-                'is_system' => 1,
+                'is_system' => true,
                 'status' => 'active'
             ]
         ];
@@ -230,7 +230,7 @@ class SeedDefaultRoles implements MigrationInterface
                 $permissionUuids[$key] = $existingPermissionMap[$permission['slug']];
             } else {
                 $permission['uuid'] = Utils::generateNanoID();
-                $permission['is_system'] = 1;
+                $permission['is_system'] = true;
                 $permissionUuids[$key] = $permission['uuid'];
                 $newPermissions[] = $permission;
             }
@@ -318,8 +318,8 @@ class SeedDefaultRoles implements MigrationInterface
         $this->db = new Connection();
 
         // Delete all system roles and permissions (will cascade to role_permissions)
-        $this->db->table('permissions')->where('is_system', 1)->delete();
-        $this->db->table('roles')->where('is_system', 1)->delete();
+        $this->db->table('permissions')->where('is_system', true)->delete();
+        $this->db->table('roles')->where('is_system', true)->delete();
     }
 
     /**
@@ -342,7 +342,7 @@ class SeedDefaultRoles implements MigrationInterface
         $existingCorePermissions = $this->db->table('permissions')
             ->select(['slug'])
             ->whereIn('slug', PermissionStandards::CORE_PERMISSIONS)
-            ->where('is_system', 1)
+            ->where('is_system', true)
             ->get();
 
         $existingSlugs = array_column($existingCorePermissions, 'slug');

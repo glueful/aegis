@@ -127,6 +127,11 @@ class PermissionRepository extends BaseRepository
     {
         $query = $this->db->table($this->table)->select($this->defaultFields);
 
+        // Normalize boolean filters
+        if (isset($filters['is_system'])) {
+            $filters['is_system'] = (bool) $filters['is_system'];
+        }
+
         if (isset($filters['category'])) {
             $query->where(['category' => $filters['category']]);
         }
@@ -169,7 +174,7 @@ class PermissionRepository extends BaseRepository
 
     public function findSystemPermissions(): array
     {
-        return $this->findAllPermissions(['is_system' => 1]);
+        return $this->findAllPermissions(['is_system' => true]);
     }
 
     public function getCategories(): array
@@ -239,6 +244,7 @@ class PermissionRepository extends BaseRepository
         }
 
         if (isset($filters['is_system'])) {
+            $filters['is_system'] = (bool) $filters['is_system'];
             $query->where(['is_system' => $filters['is_system']]);
         }
 
@@ -266,6 +272,7 @@ class PermissionRepository extends BaseRepository
         }
 
         if (isset($filters['is_system'])) {
+            $filters['is_system'] = (bool) $filters['is_system'];
             $query->where(['is_system' => $filters['is_system']]);
         }
 
@@ -292,7 +299,7 @@ class PermissionRepository extends BaseRepository
         }
 
         if (isset($filters['is_system'])) {
-            $conditions['is_system'] = $filters['is_system'];
+            $conditions['is_system'] = (bool) $filters['is_system'];
         }
 
         // Handle search separately since it needs LIKE queries
