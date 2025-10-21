@@ -55,10 +55,7 @@ class AegisServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Always register routes, migrations, and metadata regardless of DB state
-        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
-        $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
-
+        // 1) Register metadata first so CLI diagnostics always work
         try {
             $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
                 'slug' => 'aegis',
@@ -67,8 +64,25 @@ class AegisServiceProvider extends ServiceProvider
                 'description' => 'Modern, hierarchical role-based access control system',
             ]);
         } catch (\Throwable $e) {
-            // Metadata is non-critical; log and continue
-            error_log('[Aegis] Failed to register extension metadata: ' . $e->getMessage());
+            error_log('[Aegis] metadata registration failed: ' . $e->getMessage());
+        }
+
+        // 2) Load routes (executes file) — guard to avoid aborting boot
+        try {
+            $this->loadRoutesFrom(__DIR__ . '/../routes.php');
+        } catch (\Throwable $e) {
+            error_log('[Aegis] Failed to load routes: ' . $e->getMessage());
+            $env = (string)($_ENV['APP_ENV'] ?? (getenv('APP_ENV') !== false ? getenv('APP_ENV') : 'production'));
+            if ($env !== 'production') {
+                throw $e; // fail fast in non-production
+            }
+        }
+
+        // 3) Register migrations directory (low risk)
+        try {
+            $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
+        } catch (\Throwable $e) {
+            error_log('[Aegis] Failed to register migrations: ' . $e->getMessage());
         }
 
         // Permission provider wiring only if RBAC tables exist
