@@ -55,6 +55,23 @@ class AegisServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Always register routes, migrations, and metadata regardless of DB state
+        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
+        $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
+
+        try {
+            $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
+                'slug' => 'aegis',
+                'name' => 'Aegis',
+                'version' => '1.1.3',
+                'description' => 'Modern, hierarchical role-based access control system',
+            ]);
+        } catch (\Throwable $e) {
+            // Metadata is non-critical; log and continue
+            error_log('[Aegis] Failed to register extension metadata: ' . $e->getMessage());
+        }
+
+        // Permission provider wiring only if RBAC tables exist
         try {
             if (!$this->tablesExist()) {
                 return;
@@ -81,22 +98,6 @@ class AegisServiceProvider extends ServiceProvider
             }
         } catch (\Exception $e) {
             error_log('Aegis: Failed to initialize permission provider: ' . $e->getMessage());
-        }
-
-        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
-        $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
-
-        // Register extension metadata for CLI and diagnostics
-        try {
-            $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
-                'slug' => 'aegis',
-                'name' => 'Aegis',
-                'version' => '1.1.2',
-                'description' => 'Modern, hierarchical role-based access control system',
-            ]);
-        } catch (\Throwable $e) {
-            // Metadata is non-critical; log and continue
-            error_log('[Aegis] Failed to register extension metadata: ' . $e->getMessage());
         }
     }
 
