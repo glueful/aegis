@@ -44,7 +44,7 @@ php glueful extensions:disable Aegis
 Run database migrations (if not auto-run by your workflow):
 
 ```bash
-php glueful migrate run
+php glueful migrate:run
 ```
 
 ### Local Development Installation

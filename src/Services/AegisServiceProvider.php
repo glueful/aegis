@@ -85,6 +85,19 @@ class AegisServiceProvider extends ServiceProvider
 
         $this->loadRoutesFrom(__DIR__ . '/../routes.php');
         $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
+
+        // Register extension metadata for CLI and diagnostics
+        try {
+            $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
+                'slug' => 'aegis',
+                'name' => 'Aegis',
+                'version' => '1.1.2',
+                'description' => 'Modern, hierarchical role-based access control system',
+            ]);
+        } catch (\Throwable $e) {
+            // Metadata is non-critical; log and continue
+            error_log('[Aegis] Failed to register extension metadata: ' . $e->getMessage());
+        }
     }
 
     private function tablesExist(): bool
