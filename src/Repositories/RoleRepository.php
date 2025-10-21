@@ -120,6 +120,11 @@ class RoleRepository extends BaseRepository
     {
         $query = $this->db->table($this->table)->select($this->defaultFields);
 
+        // Normalize boolean filters
+        if (isset($filters['is_system'])) {
+            $filters['is_system'] = (bool) $filters['is_system'];
+        }
+
         if (isset($filters['status'])) {
             $query->where(['status' => $filters['status']]);
         }
@@ -195,7 +200,7 @@ class RoleRepository extends BaseRepository
 
     public function findSystemRoles(): array
     {
-        return $this->findAllRoles(['is_system' => 1, 'exclude_deleted' => true]);
+        return $this->findAllRoles(['is_system' => true, 'exclude_deleted' => true]);
     }
 
     public function findActiveRoles(): array
@@ -242,6 +247,7 @@ class RoleRepository extends BaseRepository
         }
 
         if (isset($filters['is_system'])) {
+            $filters['is_system'] = (bool) $filters['is_system'];
             $query->where(['is_system' => $filters['is_system']]);
         }
 
@@ -265,7 +271,7 @@ class RoleRepository extends BaseRepository
         }
 
         if (isset($filters['is_system'])) {
-            $conditions['is_system'] = $filters['is_system'];
+            $conditions['is_system'] = (bool) $filters['is_system'];
         }
 
         if (isset($filters['level'])) {
