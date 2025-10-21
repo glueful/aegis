@@ -295,32 +295,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
             return $roleController->getUsers($params, $request);
         });
 
-        /**
-         * @route POST /rbac/roles/bulk
-         * @tag RBAC Roles
-         * @summary Bulk role operations
-         * @description Performs bulk operations on multiple roles
-         * @requiresAuth true
-         * @requestBody action:string="Action to perform (delete, activate, deactivate)"
-         *              role_ids:array=[string="Role UUIDs"]
-         *              force:boolean="Force operation even with dependencies"
-         *              {required=action,role_ids}
-         * @response 200 application/json "Bulk operation completed" {
-         *   success:boolean="true",
-         *   message:string="Success message",
-         *   data:{
-         *     successful:integer="Number of successful operations",
-         *     failed:integer="Number of failed operations",
-         *     errors:array="Error messages for failed operations"
-         *   },
-         * }
-         * @response 400 application/json "Invalid request format"
-         * @response 403 application/json "Permission denied"
-         */
-        $router->post('/bulk', function (Request $request) {
-            $roleController = container()->get(RoleController::class);
-            return $roleController->bulk($request);
-        });
+        // (duplicate definition of POST /rbac/roles/bulk removed)
 
         /**
          * @route POST /rbac/roles/{role_uuid}/assign-users
