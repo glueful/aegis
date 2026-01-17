@@ -9,7 +9,7 @@
         }
     ],
     "require": {
-        "php": ">=8.1"
+        "php": "^8.3"
     },
     "require-dev": {
         "glueful/framework": "dev-main",
@@ -32,7 +32,7 @@
             "name": "Aegis",
             "displayName": "Aegis",
             "description": "Modern, hierarchical role-based access control system",
-            "version": "1.1.6",
+            "version": "1.2.0",
             "icon": "assets/icon.png",
             "galleryBanner": {
                 "color": "#2563EB",
@@ -42,7 +42,7 @@
             "publisher": "glueful-team",
             "provider": "Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider",
             "requires": {
-                "glueful": ">=1.7.3",
+                "glueful": ">=1.9.0",
                 "extensions": []
             }
         }
