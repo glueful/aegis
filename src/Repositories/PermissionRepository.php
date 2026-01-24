@@ -60,44 +60,50 @@ class PermissionRepository extends BaseRepository
 
     public function findPermissionByUuid(string $uuid): ?Permission
     {
+        $cacheKey = 'uuid_' . $uuid;
+
         // Check static cache first (works across all instances)
-        if (isset(self::$globalPermissionsCache['uuid_' . $uuid])) {
-            return self::$globalPermissionsCache['uuid_' . $uuid];
+        // Use array_key_exists to properly cache null results
+        if (array_key_exists($cacheKey, self::$globalPermissionsCache)) {
+            return self::$globalPermissionsCache[$cacheKey];
         }
 
         // Check instance cache
-        if (isset($this->permissionsCache['uuid_' . $uuid])) {
-            return $this->permissionsCache['uuid_' . $uuid];
+        if (array_key_exists($cacheKey, $this->permissionsCache)) {
+            return $this->permissionsCache[$cacheKey];
         }
 
         $result = $this->findRecordByUuid($uuid, $this->defaultFields);
         $permission = $result ? new Permission($result) : null;
 
         // Cache the result in both caches (including null results)
-        $this->permissionsCache['uuid_' . $uuid] = $permission;
-        self::$globalPermissionsCache['uuid_' . $uuid] = $permission;
+        $this->permissionsCache[$cacheKey] = $permission;
+        self::$globalPermissionsCache[$cacheKey] = $permission;
 
         return $permission;
     }
 
     public function findPermissionBySlug(string $slug): ?Permission
     {
+        $cacheKey = 'slug_' . $slug;
+
         // Check static cache first (works across all instances)
-        if (isset(self::$globalPermissionsCache['slug_' . $slug])) {
-            return self::$globalPermissionsCache['slug_' . $slug];
+        // Use array_key_exists to properly cache null results
+        if (array_key_exists($cacheKey, self::$globalPermissionsCache)) {
+            return self::$globalPermissionsCache[$cacheKey];
         }
 
         // Check instance cache
-        if (isset($this->permissionsCache['slug_' . $slug])) {
-            return $this->permissionsCache['slug_' . $slug];
+        if (array_key_exists($cacheKey, $this->permissionsCache)) {
+            return $this->permissionsCache[$cacheKey];
         }
 
         $result = $this->findBySlug($slug, $this->defaultFields);
         $permission = $result ? new Permission($result) : null;
 
         // Cache the result in both caches (including null results to prevent re-querying non-existent permissions)
-        $this->permissionsCache['slug_' . $slug] = $permission;
-        self::$globalPermissionsCache['slug_' . $slug] = $permission;
+        $this->permissionsCache[$cacheKey] = $permission;
+        self::$globalPermissionsCache[$cacheKey] = $permission;
 
         return $permission;
     }

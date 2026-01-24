@@ -32,7 +32,7 @@
             "name": "Aegis",
             "displayName": "Aegis",
             "description": "Modern, hierarchical role-based access control system",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "icon": "assets/icon.png",
             "galleryBanner": {
                 "color": "#2563EB",

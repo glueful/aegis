@@ -14,6 +14,9 @@ use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
 use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
 use Glueful\Extensions\Aegis\Services\AuditService;
+use Glueful\Extensions\Aegis\Controllers\PermissionController;
+use Glueful\Extensions\Aegis\Controllers\RoleController;
+use Glueful\Extensions\Aegis\Controllers\UserRoleController;
 
 class AegisServiceProvider extends ServiceProvider
 {
@@ -45,6 +48,34 @@ class AegisServiceProvider extends ServiceProvider
             AuditService::class => ['class' => AuditService::class, 'shared' => true],
 
             AegisPermissionProvider::class => ['class' => AegisPermissionProvider::class, 'shared' => true],
+
+            // Controllers
+            PermissionController::class => [
+                'class' => PermissionController::class,
+                'shared' => true,
+                'arguments' => [
+                    '@' . PermissionAssignmentService::class,
+                    '@' . PermissionRepository::class,
+                    '@' . UserPermissionRepository::class,
+                ],
+            ],
+            RoleController::class => [
+                'class' => RoleController::class,
+                'shared' => true,
+                'arguments' => [
+                    '@' . RoleService::class,
+                    '@' . RoleRepository::class,
+                ],
+            ],
+            UserRoleController::class => [
+                'class' => UserRoleController::class,
+                'shared' => true,
+                'arguments' => [
+                    '@' . RoleService::class,
+                    '@' . PermissionAssignmentService::class,
+                    '@' . UserRoleRepository::class,
+                ],
+            ],
         ];
     }
 

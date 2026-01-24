@@ -396,7 +396,7 @@ class AegisPermissionProvider implements PermissionProviderInterface
     {
         return [
             'name' => 'RBAC Permission Provider',
-            'version' => '1.0.0',
+            'version' => '1.2.1',
             'description' => 'Hierarchical role-based access control with direct user permissions',
             'capabilities' => [
                 'hierarchical_roles',

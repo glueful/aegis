@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with external identity providers (LDAP, Active Directory)
 - Real-time permission change notifications
 
+## [1.2.1] - 2026-01-24
+
+### Changed
+- **PermissionRepository**: Improved caching to properly handle null results.
+  - Changed from `isset()` to `array_key_exists()` for cache lookups.
+  - Prevents redundant database queries for non-existent permissions.
+  - Applies to both `findPermissionByUuid()` and `findPermissionBySlug()` methods.
+- **AegisServiceProvider**: Added explicit controller registrations to DI container.
+  - `PermissionController`, `RoleController`, `UserRoleController` now registered with dependencies.
+  - Enables proper dependency injection instead of runtime resolution.
+- **Routes**: Updated route handlers to use typed parameters.
+  - Changed from `array $params` to typed parameters (`string $uuid`, `string $user_uuid`, etc.).
+  - Aligns with framework's modern router parameter resolution system.
+  - Improves type safety and IDE autocompletion.
+
+### Notes
+- No breaking changes. All endpoints maintain the same behavior.
+- Compatible with Glueful Framework 1.19.x.
+
 ## [1.2.0] - 2026-01-17
 
 ### Breaking Changes
