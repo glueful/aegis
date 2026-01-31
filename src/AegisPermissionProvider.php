@@ -2,6 +2,7 @@
 
 namespace Glueful\Extensions\Aegis;
 
+use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Interfaces\Permission\PermissionProviderInterface;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
@@ -27,6 +28,7 @@ use Glueful\Cache\CacheStore;
  */
 class AegisPermissionProvider implements PermissionProviderInterface
 {
+    private ApplicationContext $context;
     private ?CacheStore $cache = null;
     private ?RoleRepository $roleRepository = null;
     private ?PermissionRepository $permissionRepository = null;
@@ -46,7 +48,13 @@ class AegisPermissionProvider implements PermissionProviderInterface
     private string $cachePrefix = 'rbac:';
     private bool $cacheEnabled = true;
 
-    public function initialize(array $config = []): void
+    
+    public function __construct(ApplicationContext $context)
+    {
+        $this->context = $context;
+    }
+
+public function initialize(array $config = []): void
     {
         $this->config = array_merge([
             'cache_ttl' => 3600,
@@ -63,7 +71,7 @@ class AegisPermissionProvider implements PermissionProviderInterface
         // Initialize cache store if enabled
         if ($this->cacheEnabled) {
             try {
-                $this->cache = container()->get(CacheStore::class);
+                $this->cache = container($this->context)->get(CacheStore::class);
             } catch (\Exception $e) {
                 // Graceful degradation - disable cache if initialization fails
                 $this->cacheEnabled = false;
@@ -396,7 +404,7 @@ class AegisPermissionProvider implements PermissionProviderInterface
     {
         return [
             'name' => 'RBAC Permission Provider',
-            'version' => '1.2.1',
+            'version' => '1.3.0',
             'description' => 'Hierarchical role-based access control with direct user permissions',
             'capabilities' => [
                 'hierarchical_roles',

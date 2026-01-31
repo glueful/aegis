@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Logging\LogManager;
 use Psr\Log\LoggerInterface;
 
@@ -22,9 +23,11 @@ use Psr\Log\LoggerInterface;
 class AuditService
 {
     private LoggerInterface $logger;
+    private ApplicationContext $context;
 
-    public function __construct(?LoggerInterface $logger = null)
+    public function __construct(ApplicationContext $context, ?LoggerInterface $logger = null)
     {
+        $this->context = $context;
         $this->logger = $logger ?? LogManager::getInstance()->channel('rbac_audit');
     }
     /**
@@ -327,7 +330,7 @@ class AuditService
     ): void {
         // Only log permission checks if explicitly enabled in config
         // This can be very verbose, so it's typically disabled in production
-        $config = config('rbac.logging.log_check_operations', false);
+        $config = config($this->context, 'rbac.logging.log_check_operations', false);
         if (!$config) {
             return;
         }
