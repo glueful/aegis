@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Extensions\ServiceProvider;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
@@ -45,9 +46,9 @@ class AegisServiceProvider extends ServiceProvider
                     '@' . RolePermissionRepository::class,
                 ],
             ],
-            AuditService::class => ['class' => AuditService::class, 'shared' => true],
+            AuditService::class => ['class' => AuditService::class, 'shared' => true, 'autowire' => true],
 
-            AegisPermissionProvider::class => ['class' => AegisPermissionProvider::class, 'shared' => true],
+            AegisPermissionProvider::class => ['class' => AegisPermissionProvider::class, 'shared' => true, 'autowire' => true],
 
             // Controllers
             PermissionController::class => [
@@ -79,19 +80,19 @@ class AegisServiceProvider extends ServiceProvider
         ];
     }
 
-    public function register(): void
+    public function register(ApplicationContext $context): void
     {
         $this->mergeConfig('rbac', require __DIR__ . '/../../config/rbac.php');
     }
 
-    public function boot(): void
+    public function boot(ApplicationContext $context): void
     {
         // 1) Register metadata first so CLI diagnostics always work
         try {
             $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
                 'slug' => 'aegis',
                 'name' => 'Aegis',
-                'version' => '1.1.6',
+                'version' => '1.3.0',
                 'description' => 'Modern, hierarchical role-based access control system',
             ]);
         } catch (\Throwable $e) {
@@ -123,7 +124,7 @@ class AegisServiceProvider extends ServiceProvider
             }
 
             $provider = $this->app->get(AegisPermissionProvider::class);
-            $config = config('rbac', []);
+            $config = config($context, 'rbac', []);
             $providerConfig = [
                 'cache_enabled' => $config['permissions']['cache_enabled'] ?? true,
                 'cache_ttl' => $config['permissions']['cache_ttl'] ?? 3600,

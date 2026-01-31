@@ -486,8 +486,8 @@ Adjust `Aegis/config/rbac.php` to disable caches or enable check logging as need
 
 ## Requirements
 
-- PHP 8.1 or higher
-- Glueful 1.0.0 or higher
+- PHP 8.3 or higher
+- Glueful 1.22.0 or higher
 - MySQL, PostgreSQL, or SQLite database
 - Redis or Memcached (optional, for distributed caching)
 
