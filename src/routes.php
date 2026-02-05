@@ -21,7 +21,6 @@ use Glueful\Extensions\Aegis\Controllers\{
     PermissionController,
     UserRoleController
 };
-use Symfony\Component\HttpFoundation\Request;
 
 /** @var Router $router Router instance injected by RouteManifest::load() */
 
@@ -64,10 +63,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/', function (Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->index($request);
-        });
+        $router->get('/', [RoleController::class, 'index']);
 
         /**
          * @route GET /rbac/roles/stats
@@ -87,10 +83,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/stats', function (Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->stats($request);
-        });
+        $router->get('/stats', [RoleController::class, 'stats']);
 
         /**
          * @route POST /rbac/roles/bulk
@@ -114,10 +107,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/bulk', function (Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->bulk($request);
-        });
+        $router->post('/bulk', [RoleController::class, 'bulk']);
 
         /**
          * @route GET /rbac/roles/{uuid}
@@ -148,10 +138,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->get('/{uuid}', function (string $uuid) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->show(['uuid' => $uuid]);
-        });
+        $router->get('/{uuid}', [RoleController::class, 'show']);
 
         /**
          * @route POST /rbac/roles
@@ -175,10 +162,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 409 application/json "Role name or slug already exists"
          */
-        $router->post('/', function (Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->create($request);
-        });
+        $router->post('/', [RoleController::class, 'create']);
 
         /**
          * @route PUT /rbac/roles/{uuid}
@@ -197,10 +181,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->put('/{uuid}', function (string $uuid, Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->update(['uuid' => $uuid], $request);
-        });
+        $router->put('/{uuid}', [RoleController::class, 'update']);
 
         /**
          * @route DELETE /rbac/roles/{uuid}
@@ -215,10 +196,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->delete('/{uuid}', function (string $uuid, Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->delete(['uuid' => $uuid], $request);
-        });
+        $router->delete('/{uuid}', [RoleController::class, 'delete']);
 
         /**
          * @route POST /rbac/roles/{uuid}/assign
@@ -237,10 +215,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role or user not found"
          */
-        $router->post('/{uuid}/assign', function (string $uuid, Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->assignToUser(['uuid' => $uuid], $request);
-        });
+        $router->post('/{uuid}/assign', [RoleController::class, 'assignToUser']);
 
         /**
          * @route DELETE /rbac/roles/{uuid}/revoke
@@ -255,10 +230,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role or user not found"
          */
-        $router->delete('/{uuid}/revoke', function (string $uuid, Request $request) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            return $roleController->revokeFromUser(['uuid' => $uuid], $request);
-        });
+        $router->delete('/{uuid}/revoke', [RoleController::class, 'revokeFromUser']);
 
         /**
          * @route GET /rbac/roles/{uuid}/users
@@ -289,13 +261,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->get('/{uuid}/users', function (string $uuid) {
-            $roleController = container($router->getContext())->get(RoleController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $roleController->getUsers(['uuid' => $uuid], $request);
-        });
-
-        // (duplicate definition of POST /rbac/roles/bulk removed)
+        $router->get('/{uuid}/users', [RoleController::class, 'getUsers']);
 
         /**
          * @route POST /rbac/roles/{role_uuid}/assign-users
@@ -314,10 +280,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->post('/{role_uuid}/assign-users', function (string $role_uuid, Request $request) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->bulkAssignRoleToUsers(['role_uuid' => $role_uuid], $request);
-        });
+        $router->post('/{role_uuid}/assign-users', [UserRoleController::class, 'bulkAssignRoleToUsers']);
 
         /**
          * @route DELETE /rbac/roles/{role_uuid}/revoke-users
@@ -332,10 +295,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->delete('/{role_uuid}/revoke-users', function (string $role_uuid, Request $request) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->bulkRevokeRoleFromUsers(['role_uuid' => $role_uuid], $request);
-        });
+        $router->delete('/{role_uuid}/revoke-users', [UserRoleController::class, 'bulkRevokeRoleFromUsers']);
     });
 
     // Permission Management Routes
@@ -375,10 +335,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->index($request);
-        });
+        $router->get('/', [PermissionController::class, 'index']);
 
         /**
          * @route GET /rbac/permissions/stats
@@ -399,10 +356,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/stats', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->stats($request);
-        });
+        $router->get('/stats', [PermissionController::class, 'stats']);
 
         /**
          * @route POST /rbac/permissions/cleanup-expired
@@ -413,10 +367,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 200 application/json "Expired permissions cleaned up"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/cleanup-expired', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->cleanupExpired($request);
-        });
+        $router->post('/cleanup-expired', [PermissionController::class, 'cleanupExpired']);
 
         /**
          * @route GET /rbac/permissions/categories
@@ -431,10 +382,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/categories', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->getCategories($request);
-        });
+        $router->get('/categories', [PermissionController::class, 'getCategories']);
 
         /**
          * @route GET /rbac/permissions/resource-types
@@ -449,10 +397,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/resource-types', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->getResourceTypes($request);
-        });
+        $router->get('/resource-types', [PermissionController::class, 'getResourceTypes']);
 
         /**
          * @route GET /rbac/permissions/{uuid}
@@ -480,10 +425,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->get('/{uuid}', function (string $uuid) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->show(['uuid' => $uuid]);
-        });
+        $router->get('/{uuid}', [PermissionController::class, 'show']);
 
         /**
          * @route POST /rbac/permissions
@@ -503,10 +445,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 409 application/json "Permission name or slug already exists"
          */
-        $router->post('/', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->create($request);
-        });
+        $router->post('/', [PermissionController::class, 'create']);
 
         /**
          * @route PUT /rbac/permissions/{uuid}
@@ -524,10 +463,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->put('/{uuid}', function (string $uuid, Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->update(['uuid' => $uuid], $request);
-        });
+        $router->put('/{uuid}', [PermissionController::class, 'update']);
 
         /**
          * @route DELETE /rbac/permissions/{uuid}
@@ -542,10 +478,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->delete('/{uuid}', function (string $uuid, Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->delete(['uuid' => $uuid], $request);
-        });
+        $router->delete('/{uuid}', [PermissionController::class, 'delete']);
 
         /**
          * @route POST /rbac/permissions/{uuid}/assign
@@ -565,10 +498,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission or user not found"
          */
-        $router->post('/{uuid}/assign', function (string $uuid, Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->assignToUser(['uuid' => $uuid], $request);
-        });
+        $router->post('/{uuid}/assign', [PermissionController::class, 'assignToUser']);
 
         /**
          * @route DELETE /rbac/permissions/{uuid}/revoke
@@ -583,10 +513,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission or user not found"
          */
-        $router->delete('/{uuid}/revoke', function (string $uuid, Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->revokeFromUser(['uuid' => $uuid], $request);
-        });
+        $router->delete('/{uuid}/revoke', [PermissionController::class, 'revokeFromUser']);
 
         /**
          * @route POST /rbac/permissions/batch-assign
@@ -602,10 +529,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/batch-assign', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->batchAssign($request);
-        });
+        $router->post('/batch-assign', [PermissionController::class, 'batchAssign']);
 
         /**
          * @route POST /rbac/permissions/batch-revoke
@@ -620,10 +544,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/batch-revoke', function (Request $request) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            return $permissionController->batchRevoke($request);
-        });
+        $router->post('/batch-revoke', [PermissionController::class, 'batchRevoke']);
     });
 
     // User-specific RBAC Routes
@@ -654,11 +575,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "User not found"
          */
-        $router->get('/{user_uuid}/roles', function (string $user_uuid) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $userRoleController->getUserRoles(['user_uuid' => $user_uuid], $request);
-        });
+        $router->get('/{user_uuid}/roles', [UserRoleController::class, 'getUserRoles']);
 
         /**
          * @route POST /rbac/users/{user_uuid}/roles
@@ -676,10 +593,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/{user_uuid}/roles', function (string $user_uuid, Request $request) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->assignRoles(['user_uuid' => $user_uuid], $request);
-        });
+        $router->post('/{user_uuid}/roles', [UserRoleController::class, 'assignRoles']);
 
         /**
          * @route PUT /rbac/users/{user_uuid}/roles
@@ -697,10 +611,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->put('/{user_uuid}/roles', function (string $user_uuid, Request $request) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->replaceUserRoles(['user_uuid' => $user_uuid], $request);
-        });
+        $router->put('/{user_uuid}/roles', [UserRoleController::class, 'replaceUserRoles']);
 
         /**
          * @route DELETE /rbac/users/{user_uuid}/roles/{role_uuid}
@@ -714,10 +625,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "User or role not found"
          */
-        $router->delete('/{user_uuid}/roles/{role_uuid}', function (string $user_uuid, string $role_uuid) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->revokeRole(['user_uuid' => $user_uuid, 'role_uuid' => $role_uuid]);
-        });
+        $router->delete('/{user_uuid}/roles/{role_uuid}', [UserRoleController::class, 'revokeRole']);
 
         /**
          * @route GET /rbac/users/{user_uuid}/permissions
@@ -746,11 +654,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/permissions', function (string $user_uuid) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $permissionController->getUserDirectPermissions(['user_uuid' => $user_uuid], $request);
-        });
+        $router->get('/{user_uuid}/permissions', [PermissionController::class, 'getUserDirectPermissions']);
 
         /**
          * @route GET /rbac/users/{user_uuid}/effective-permissions
@@ -779,11 +683,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/effective-permissions', function (string $user_uuid) {
-            $permissionController = container($router->getContext())->get(PermissionController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $permissionController->getUserEffectivePermissions(['user_uuid' => $user_uuid], $request);
-        });
+        $router->get('/{user_uuid}/effective-permissions', [PermissionController::class, 'getUserEffectivePermissions']);
 
         /**
          * @route GET /rbac/users/{user_uuid}/access-overview
@@ -822,11 +722,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/access-overview', function (string $user_uuid) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $userRoleController->getUserAccessOverview(['user_uuid' => $user_uuid], $request);
-        });
+        $router->get('/{user_uuid}/access-overview', [UserRoleController::class, 'getUserAccessOverview']);
 
         /**
          * @route GET /rbac/users/{user_uuid}/role-history
@@ -862,11 +758,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/role-history', function (string $user_uuid) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
-            return $userRoleController->getUserRoleHistory(['user_uuid' => $user_uuid], $request);
-        });
+        $router->get('/{user_uuid}/role-history', [UserRoleController::class, 'getUserRoleHistory']);
 
         /**
          * @route POST /rbac/users/{user_uuid}/check-role
@@ -890,10 +782,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/{user_uuid}/check-role', function (string $user_uuid, Request $request) {
-            $userRoleController = container($router->getContext())->get(UserRoleController::class);
-            return $userRoleController->checkUserRole(['user_uuid' => $user_uuid], $request);
-        });
+        $router->post('/{user_uuid}/check-role', [UserRoleController::class, 'checkUserRole']);
     });
 
     // Permission/Role Checking Routes
@@ -920,10 +809,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * @response 400 application/json "Invalid request format"
      * @response 403 application/json "Permission denied"
      */
-    $router->post('/check-permission', function (Request $request) {
-        $permissionController = container($router->getContext())->get(PermissionController::class);
-        return $permissionController->checkPermission($request);
-    });
+    $router->post('/check-permission', [PermissionController::class, 'checkPermission']);
 
     // Statistics and Maintenance Routes
     /**
@@ -944,10 +830,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * }
      * @response 403 application/json "Permission denied"
      */
-    $router->get('/user-roles/stats', function (Request $request) {
-        $userRoleController = container($router->getContext())->get(UserRoleController::class);
-        return $userRoleController->stats($request);
-    });
+    $router->get('/user-roles/stats', [UserRoleController::class, 'stats']);
 
     /**
      * @route POST /rbac/user-roles/cleanup-expired
@@ -958,8 +841,5 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * @response 200 application/json "Expired role assignments cleaned up"
      * @response 403 application/json "Permission denied"
      */
-    $router->post('/user-roles/cleanup-expired', function (Request $request) {
-        $userRoleController = container($router->getContext())->get(UserRoleController::class);
-        return $userRoleController->cleanupExpiredRoles($request);
-    });
+    $router->post('/user-roles/cleanup-expired', [UserRoleController::class, 'cleanupExpiredRoles']);
 });

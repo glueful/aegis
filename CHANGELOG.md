@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with external identity providers (LDAP, Active Directory)
 - Real-time permission change notifications
 
+## [1.4.0] - 2026-02-05
+
+### Changed
+- **Framework Compatibility**: Updated minimum framework requirement to Glueful 1.28.0
+  - Compatible with route caching infrastructure (Bellatrix release)
+  - Extension already uses `[Controller::class, 'method']` syntax - no code changes required
+  - Controllers already accept `Request` directly with proper parameter extraction
+- **composer.json**: Updated `extra.glueful.requires.glueful` to `>=1.28.0`
+
+### Framework Features Now Available
+- **Route Caching Support**: Routes can now be compiled and cached for improved performance
+- **Closure Detection**: RouteCompiler validates handlers and warns about non-cacheable routes
+- **ResourceController Refactoring**: Framework controllers use RESTful naming conventions
+
+### Notes
+- This release ensures compatibility with Glueful Framework 1.28.0's route caching improvements
+- No breaking changes - extension was already following best practices
+- Run `composer update` after upgrading
+
 ## [1.3.0] - 2026-01-31
 
 ### Changed

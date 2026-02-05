@@ -404,7 +404,7 @@ public function initialize(array $config = []): void
     {
         return [
             'name' => 'RBAC Permission Provider',
-            'version' => '1.3.0',
+            'version' => '1.4.0',
             'description' => 'Hierarchical role-based access control with direct user permissions',
             'capabilities' => [
                 'hierarchical_roles',

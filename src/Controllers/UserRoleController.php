@@ -39,14 +39,11 @@ class UserRoleController
      * Get all roles for a specific user
      *
      * @route GET /api/rbac/users/{user_uuid}/roles
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUserRoles(array $params, Request $request): Response
+    public function getUserRoles(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];
@@ -66,14 +63,11 @@ class UserRoleController
      * Assign multiple roles to a user
      *
      * @route POST /api/rbac/users/{user_uuid}/roles
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function assignRoles(array $params, Request $request): Response
+    public function assignRoles(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $data = $request->toArray();
 
             if (empty($data['role_uuids'])) {
@@ -123,14 +117,12 @@ class UserRoleController
      * Revoke specific role from user
      *
      * @route DELETE /api/rbac/users/{user_uuid}/roles/{role_uuid}
-     * @param array $params
-     * @return Response
      */
-    public function revokeRole(array $params): Response
+    public function revokeRole(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
-            $roleUuid = $params['role_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
+            $roleUuid = $request->attributes->get('role_uuid', '');
 
             $revoked = $this->roleService->revokeRoleFromUser($userUuid, $roleUuid);
             if (!$revoked) {
@@ -147,14 +139,11 @@ class UserRoleController
      * Replace all user roles
      *
      * @route PUT /api/rbac/users/{user_uuid}/roles
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function replaceUserRoles(array $params, Request $request): Response
+    public function replaceUserRoles(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $data = $request->toArray();
 
             if (!isset($data['role_uuids']) || !is_array($data['role_uuids'])) {
@@ -217,14 +206,11 @@ class UserRoleController
      * Check if user has specific role
      *
      * @route POST /api/rbac/users/{user_uuid}/check-role
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function checkUserRole(array $params, Request $request): Response
+    public function checkUserRole(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $data = $request->toArray();
 
             if (empty($data['role_slug'])) {
@@ -252,14 +238,11 @@ class UserRoleController
      * Get user's complete access overview (roles + permissions)
      *
      * @route GET /api/rbac/users/{user_uuid}/access-overview
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUserAccessOverview(array $params, Request $request): Response
+    public function getUserAccessOverview(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];
@@ -287,14 +270,11 @@ class UserRoleController
      * Get role assignment history for user
      *
      * @route GET /api/rbac/users/{user_uuid}/role-history
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUserRoleHistory(array $params, Request $request): Response
+    public function getUserRoleHistory(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $page = (int) $request->query->get('page', 1);
             $perPage = (int) $request->query->get('per_page', 25);
             $includeDeleted = filter_var($request->query->get('include_deleted', true), FILTER_VALIDATE_BOOLEAN);
@@ -319,14 +299,11 @@ class UserRoleController
      * Bulk assign role to multiple users
      *
      * @route POST /api/rbac/roles/{role_uuid}/assign-users
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function bulkAssignRoleToUsers(array $params, Request $request): Response
+    public function bulkAssignRoleToUsers(Request $request): Response
     {
         try {
-            $roleUuid = $params['role_uuid'] ?? '';
+            $roleUuid = $request->attributes->get('role_uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuids'])) {
@@ -376,14 +353,11 @@ class UserRoleController
      * Bulk revoke role from multiple users
      *
      * @route DELETE /api/rbac/roles/{role_uuid}/revoke-users
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function bulkRevokeRoleFromUsers(array $params, Request $request): Response
+    public function bulkRevokeRoleFromUsers(Request $request): Response
     {
         try {
-            $roleUuid = $params['role_uuid'] ?? '';
+            $roleUuid = $request->attributes->get('role_uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuids'])) {
@@ -427,10 +401,8 @@ class UserRoleController
      * Get user role statistics
      *
      * @route GET /api/rbac/user-roles/stats
-     * @param Request $request
-     * @return Response
      */
-    public function stats(Request $request): Response
+    public function stats(): Response
     {
         try {
             $stats = [];
@@ -468,10 +440,8 @@ class UserRoleController
      * Cleanup expired role assignments
      *
      * @route POST /api/rbac/user-roles/cleanup-expired
-     * @param Request $request
-     * @return Response
      */
-    public function cleanupExpiredRoles(Request $request): Response
+    public function cleanupExpiredRoles(): Response
     {
         try {
             $expired = $this->userRoleRepository->findExpiredRoles();

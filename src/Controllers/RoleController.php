@@ -8,7 +8,6 @@ use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Exceptions\NotFoundException;
-use Glueful\Constants\ErrorCodes;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -35,8 +34,6 @@ class RoleController
      * Get all roles with their hierarchy
      *
      * @route GET /api/rbac/roles
-     * @param Request $request
-     * @return Response
      */
     public function index(Request $request): Response
     {
@@ -80,13 +77,11 @@ class RoleController
      * Get a single role with details
      *
      * @route GET /api/rbac/roles/{uuid}
-     * @param array $params
-     * @return Response
      */
-    public function show(array $params): Response
+    public function show(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
 
             $role = $this->roleRepository->findRecordByUuid($uuid);
             if (!$role) {
@@ -112,8 +107,6 @@ class RoleController
      * Create a new role
      *
      * @route POST /api/rbac/roles
-     * @param Request $request
-     * @return Response
      */
     public function create(Request $request): Response
     {
@@ -144,14 +137,11 @@ class RoleController
      * Update an existing role
      *
      * @route PUT /api/rbac/roles/{uuid}
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function update(array $params, Request $request): Response
+    public function update(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             $updated = $this->roleService->updateRole($uuid, $data);
@@ -172,14 +162,11 @@ class RoleController
      * Delete a role
      *
      * @route DELETE /api/rbac/roles/{uuid}
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function delete(array $params, Request $request): Response
+    public function delete(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
             $deleted = $this->roleService->deleteRole($uuid, $force);
@@ -199,14 +186,11 @@ class RoleController
      * Assign role to user
      *
      * @route POST /api/rbac/roles/{uuid}/assign
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function assignToUser(array $params, Request $request): Response
+    public function assignToUser(Request $request): Response
     {
         try {
-            $roleUuid = $params['uuid'] ?? '';
+            $roleUuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuid'])) {
@@ -236,14 +220,11 @@ class RoleController
      * Revoke role from user
      *
      * @route DELETE /api/rbac/roles/{uuid}/revoke
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function revokeFromUser(array $params, Request $request): Response
+    public function revokeFromUser(Request $request): Response
     {
         try {
-            $roleUuid = $params['uuid'] ?? '';
+            $roleUuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuid'])) {
@@ -265,14 +246,11 @@ class RoleController
      * Get users assigned to a role
      *
      * @route GET /api/rbac/roles/{uuid}/users
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUsers(array $params, Request $request): Response
+    public function getUsers(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
             $page = (int) $request->query->get('page', 1);
             $perPage = (int) $request->query->get('per_page', 25);
 
@@ -298,10 +276,8 @@ class RoleController
      * Get role statistics
      *
      * @route GET /api/rbac/roles/stats
-     * @param Request $request
-     * @return Response
      */
-    public function stats(Request $request): Response
+    public function stats(): Response
     {
         try {
             $stats = [];
@@ -338,8 +314,6 @@ class RoleController
      * Bulk role operations
      *
      * @route POST /api/rbac/roles/bulk
-     * @param Request $request
-     * @return Response
      */
     public function bulk(Request $request): Response
     {
