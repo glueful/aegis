@@ -40,8 +40,6 @@ class PermissionController
      * Get all permissions
      *
      * @route GET /api/rbac/permissions
-     * @param Request $request
-     * @return Response
      */
     public function index(Request $request): Response
     {
@@ -67,9 +65,9 @@ class PermissionController
 
             $permissionsData = $permissions['data'];
             $meta = $permissions;
-             unset($meta['data']);
+            unset($meta['data']);
 
-            return Response::successWithMeta($permissionsData, $meta, 'Permissions retrieved successfully',);
+            return Response::successWithMeta($permissionsData, $meta, 'Permissions retrieved successfully');
         } catch (\Exception $e) {
             return Response::serverError($e->getMessage());
         }
@@ -79,13 +77,11 @@ class PermissionController
      * Get a single permission with details
      *
      * @route GET /api/rbac/permissions/{uuid}
-     * @param array $params
-     * @return Response
      */
-    public function show(array $params): Response
+    public function show(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
 
             $permission = $this->permissionRepository->findRecordByUuid($uuid);
             if (!$permission) {
@@ -109,8 +105,6 @@ class PermissionController
      * Create a new permission
      *
      * @route POST /api/rbac/permissions
-     * @param Request $request
-     * @return Response
      */
     public function create(Request $request): Response
     {
@@ -141,14 +135,11 @@ class PermissionController
      * Update an existing permission
      *
      * @route PUT /api/rbac/permissions/{uuid}
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function update(array $params, Request $request): Response
+    public function update(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             $updated = $this->permissionService->updatePermission($uuid, $data);
@@ -169,14 +160,11 @@ class PermissionController
      * Delete a permission
      *
      * @route DELETE /api/rbac/permissions/{uuid}
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function delete(array $params, Request $request): Response
+    public function delete(Request $request): Response
     {
         try {
-            $uuid = $params['uuid'] ?? '';
+            $uuid = $request->attributes->get('uuid', '');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
             $deleted = $this->permissionService->deletePermission($uuid, $force);
@@ -196,14 +184,11 @@ class PermissionController
      * Assign permission to user
      *
      * @route POST /api/rbac/permissions/{uuid}/assign
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function assignToUser(array $params, Request $request): Response
+    public function assignToUser(Request $request): Response
     {
         try {
-            $permissionUuid = $params['uuid'] ?? '';
+            $permissionUuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuid'])) {
@@ -250,14 +235,11 @@ class PermissionController
      * Revoke permission from user
      *
      * @route DELETE /api/rbac/permissions/{uuid}/revoke
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function revokeFromUser(array $params, Request $request): Response
+    public function revokeFromUser(Request $request): Response
     {
         try {
-            $permissionUuid = $params['uuid'] ?? '';
+            $permissionUuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
             if (empty($data['user_uuid'])) {
@@ -289,8 +271,6 @@ class PermissionController
      * Batch assign permissions to user
      *
      * @route POST /api/rbac/permissions/batch-assign
-     * @param Request $request
-     * @return Response
      */
     public function batchAssign(Request $request): Response
     {
@@ -321,8 +301,6 @@ class PermissionController
      * Batch revoke permissions from user
      *
      * @route POST /api/rbac/permissions/batch-revoke
-     * @param Request $request
-     * @return Response
      */
     public function batchRevoke(Request $request): Response
     {
@@ -354,14 +332,11 @@ class PermissionController
      * Get user's direct permissions
      *
      * @route GET /api/rbac/users/{user_uuid}/permissions
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUserDirectPermissions(array $params, Request $request): Response
+    public function getUserDirectPermissions(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $activeOnly = filter_var($request->query->get('active_only', true), FILTER_VALIDATE_BOOLEAN);
 
             $filters = [];
@@ -381,14 +356,11 @@ class PermissionController
      * Get user's effective permissions (direct + role-based)
      *
      * @route GET /api/rbac/users/{user_uuid}/effective-permissions
-     * @param array $params
-     * @param Request $request
-     * @return Response
      */
-    public function getUserEffectivePermissions(array $params, Request $request): Response
+    public function getUserEffectivePermissions(Request $request): Response
     {
         try {
-            $userUuid = $params['user_uuid'] ?? '';
+            $userUuid = $request->attributes->get('user_uuid', '');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];
@@ -408,8 +380,6 @@ class PermissionController
      * Check if user has specific permission
      *
      * @route POST /api/rbac/check-permission
-     * @param Request $request
-     * @return Response
      */
     public function checkPermission(Request $request): Response
     {
@@ -445,10 +415,8 @@ class PermissionController
      * Get permission statistics
      *
      * @route GET /api/rbac/permissions/stats
-     * @param Request $request
-     * @return Response
      */
-    public function stats(Request $request): Response
+    public function stats(): Response
     {
         try {
             $stats = [];
@@ -491,10 +459,8 @@ class PermissionController
      * Cleanup expired permissions
      *
      * @route POST /api/rbac/permissions/cleanup-expired
-     * @param Request $request
-     * @return Response
      */
-    public function cleanupExpired(Request $request): Response
+    public function cleanupExpired(): Response
     {
         try {
             $results = $this->permissionService->cleanupExpiredPermissions();
@@ -509,10 +475,8 @@ class PermissionController
      * Get permission categories
      *
      * @route GET /api/rbac/permissions/categories
-     * @param Request $request
-     * @return Response
      */
-    public function getCategories(Request $request): Response
+    public function getCategories(): Response
     {
         try {
             $categories = $this->permissionRepository->getCategories();
@@ -527,10 +491,8 @@ class PermissionController
      * Get resource types
      *
      * @route GET /api/rbac/permissions/resource-types
-     * @param Request $request
-     * @return Response
      */
-    public function getResourceTypes(Request $request): Response
+    public function getResourceTypes(): Response
     {
         try {
             $resourceTypes = $this->permissionRepository->getResourceTypes();

@@ -92,7 +92,7 @@ class AegisServiceProvider extends ServiceProvider
             $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
                 'slug' => 'aegis',
                 'name' => 'Aegis',
-                'version' => '1.3.0',
+                'version' => '1.4.0',
                 'description' => 'Modern, hierarchical role-based access control system',
             ]);
         } catch (\Throwable $e) {
