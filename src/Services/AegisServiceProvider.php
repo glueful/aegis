@@ -21,6 +21,22 @@ use Glueful\Extensions\Aegis\Controllers\UserRoleController;
 
 class AegisServiceProvider extends ServiceProvider
 {
+    private static ?string $cachedVersion = null;
+
+    /**
+     * Read the extension version from composer.json (cached)
+     */
+    public static function composerVersion(): string
+    {
+        if (self::$cachedVersion === null) {
+            $path = __DIR__ . '/../../composer.json';
+            $composer = json_decode(file_get_contents($path), true);
+            self::$cachedVersion = $composer['version'] ?? '0.0.0';
+        }
+
+        return self::$cachedVersion;
+    }
+
     public static function services(): array
     {
         return [
@@ -92,7 +108,7 @@ class AegisServiceProvider extends ServiceProvider
             $this->app->get(\Glueful\Extensions\ExtensionManager::class)->registerMeta(self::class, [
                 'slug' => 'aegis',
                 'name' => 'Aegis',
-                'version' => '1.4.0',
+                'version' => self::composerVersion(),
                 'description' => 'Modern, hierarchical role-based access control system',
             ]);
         } catch (\Throwable $e) {
