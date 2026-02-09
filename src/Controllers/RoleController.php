@@ -7,7 +7,7 @@ namespace Glueful\Extensions\Aegis\Controllers;
 use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
-use Glueful\Exceptions\NotFoundException;
+use Glueful\Http\Exceptions\Client\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 
 /**

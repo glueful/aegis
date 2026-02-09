@@ -8,7 +8,7 @@ use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
-use Glueful\Exceptions\NotFoundException;
+use Glueful\Http\Exceptions\Client\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
