@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with external identity providers (LDAP, Active Directory)
 - Real-time permission change notifications
 
+## [1.5.0] - 2026-02-09
+
+### Changed
+- **Framework Compatibility**: Updated minimum framework requirement to Glueful 1.30.0 (Diphda release)
+- **Exception Imports**: Migrated from deleted legacy bridge classes to modern exception namespaces
+  - `Glueful\Exceptions\NotFoundException` → `Glueful\Http\Exceptions\Client\NotFoundException` in `RoleController` and `PermissionController`
+- **composer.json**: Updated `extra.glueful.requires.glueful` to `>=1.30.0`, version bumped to `1.5.0`
+
+### Notes
+- No breaking changes to extension API. Import path change is internal.
+- Requires Glueful Framework 1.30.0+ due to removal of legacy exception bridge classes.
+
 ## [1.4.1] - 2026-02-06
 
 ### Changed
