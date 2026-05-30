@@ -29,17 +29,17 @@ composer require glueful/aegis
 php glueful extensions:cache
 ```
 
-Glueful auto-discovers packages of type `glueful-extension` and boots their service providers.
-
-Enable/disable in development:
+Composer discovers packages of type `glueful-extension`, but **installing does not auto-enable** them — the provider must be added to `config/extensions.php`'s `enabled` allow-list. The CLI does that for you:
 
 ```bash
-# Enable (adds provider to config/extensions.php)
-php glueful extensions:enable Aegis
+# Enable (adds the provider FQCN to config/extensions.php + recompiles the cache)
+php glueful extensions:enable aegis
 
-# Disable in dev
-php glueful extensions:disable Aegis
+# Disable (removes it)
+php glueful extensions:disable aegis
 ```
+
+In production, manage the `enabled` list in config and run `php glueful extensions:cache` in your deploy step.
 
 Run database migrations (if not auto-run by your workflow):
 
@@ -49,29 +49,21 @@ php glueful migrate:run
 
 ### Local Development Installation
 
-If you're working locally (without Composer), place the extension in `extensions/Aegis`, ensure `config/extensions.php` has `local_path` pointing to `extensions` (non‑prod).
+To develop the extension locally, register it as a Composer **path repository** in your app's `composer.json`, then require and enable it:
 
-Enable the provider for development (choose one):
+```jsonc
+// composer.json
+"repositories": [
+    { "type": "path", "url": "extensions/aegis", "options": { "symlink": true } }
+]
+```
 
-- CLI (recommended):
-  ```bash
-  php glueful extensions:enable Aegis
-  ```
+```bash
+composer require glueful/aegis:@dev
+php glueful extensions:enable aegis
+```
 
-- Manual `config/extensions.php` edit:
-  ```php
-  return [
-      'enabled' => [
-          // ... other providers
-          Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider::class,
-      ],
-      'dev_only' => [
-          // Optionally keep Aegis dev-only
-      ],
-      'local_path' => env('APP_ENV') === 'production' ? null : 'extensions',
-      'scan_composer' => true,
-  ];
-  ```
+Entries in `config/extensions.php` are plain string FQCNs (no `::class`) — prefer `extensions:enable` over editing by hand.
 
 Run the migrations to create the necessary database tables:
 ```bash
@@ -91,8 +83,8 @@ Check status and details:
 
 ```bash
 php glueful extensions:list
-php glueful extensions:info Aegis
-php glueful extensions:why Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider
+php glueful extensions:info aegis
+php glueful extensions:diagnose
 ```
 
 Post-install checklist:
