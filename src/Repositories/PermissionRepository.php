@@ -22,7 +22,7 @@ class PermissionRepository extends BaseRepository
     protected string $table = 'permissions';
     protected array $defaultFields = [
         'uuid', 'name', 'slug', 'description', 'category',
-        'resource_type', 'is_system', 'metadata', 'created_at'
+        'resource_type', 'is_system', 'managed_by', 'metadata', 'created_at'
     ];
     protected bool $hasUpdatedAt = false;
 
@@ -55,7 +55,41 @@ class PermissionRepository extends BaseRepository
     public function createPermission(array $data): ?Permission
     {
         $uuid = $this->create($data);
+        // Invalidate any cached null-miss for this slug so a write-then-read in the same
+        // process (e.g. sync creating then resolving a permission) sees the new row.
+        if (isset($data['slug'])) {
+            unset(
+                $this->permissionsCache['slug_' . $data['slug']],
+                self::$globalPermissionsCache['slug_' . $data['slug']]
+            );
+        }
         return $this->findPermissionByUuid($uuid);
+    }
+
+    /**
+     * Clear the cross-instance lookup cache. Primarily for test isolation, where successive
+     * cases use distinct databases but share the static cache within one process.
+     */
+    public static function clearCache(): void
+    {
+        self::$globalPermissionsCache = [];
+    }
+
+    /**
+     * Managed (extension/app-synced) permissions only: managed_by IS NOT NULL.
+     *
+     * @return array<string, string> slug => managed_by
+     */
+    public function findManaged(): array
+    {
+        $rows = $this->db->table($this->table)->select(['slug', 'managed_by'])->get();
+        $out = [];
+        foreach ($rows as $row) {
+            if (($row['managed_by'] ?? null) !== null) {
+                $out[(string) $row['slug']] = (string) $row['managed_by'];
+            }
+        }
+        return $out;
     }
 
     public function findPermissionByUuid(string $uuid): ?Permission

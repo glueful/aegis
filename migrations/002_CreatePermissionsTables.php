@@ -38,6 +38,9 @@ class CreatePermissionsTables implements MigrationInterface
             $table->string('category', 50)->nullable();
             $table->string('resource_type', 100)->nullable();
             $table->boolean('is_system')->default(false);
+            // Composer package name of the declarer for catalog-synced rows; NULL for
+            // hand-created (API/UI) rows. Drives stale detection / safe prune.
+            $table->string('managed_by', 100)->nullable();
             $table->json('metadata')->nullable();
             $table->timestamp('created_at')->default('CURRENT_TIMESTAMP');
 
@@ -60,6 +63,10 @@ class CreatePermissionsTables implements MigrationInterface
             $table->string('granted_by', 12)->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('created_at')->default('CURRENT_TIMESTAMP');
+            // RolePermissionRepository uses the BaseRepository soft-delete + updated_at lifecycle,
+            // so these columns are required for assign/replace/revoke to work.
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
 
             // Add indexes
             $table->unique('uuid');

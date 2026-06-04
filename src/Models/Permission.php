@@ -22,6 +22,7 @@ class Permission
     private ?string $category;
     private ?string $resourceType;
     private bool $isSystem;
+    private ?string $managedBy;
     private array $metadata;
     private string $createdAt;
 
@@ -34,8 +35,14 @@ class Permission
         $this->category = $data['category'] ?? null;
         $this->resourceType = $data['resource_type'] ?? null;
         $this->isSystem = (bool)($data['is_system'] ?? false);
+        $this->managedBy = $data['managed_by'] ?? null;
         $this->metadata = isset($data['metadata']) ? json_decode($data['metadata'], true) ?? [] : [];
         $this->createdAt = $data['created_at'] ?? '';
+    }
+
+    public function getManagedBy(): ?string
+    {
+        return $this->managedBy;
     }
 
     public function getUuid(): string
