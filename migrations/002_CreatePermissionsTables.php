@@ -77,7 +77,8 @@ class CreatePermissionsTables implements MigrationInterface
             $table->index('expires_at');
             $table->index('granted_by');
 
-            // Add foreign keys
+            // Foreign keys. granted_by is an external principal id — indexed only, no FK into
+            // users (design §2). Intra-package role/permission FKs are kept.
             $table->foreign('role_uuid')
                 ->references('uuid')
                 ->on('roles')
@@ -87,11 +88,6 @@ class CreatePermissionsTables implements MigrationInterface
                 ->references('uuid')
                 ->on('permissions')
                 ->cascadeOnDelete();
-
-            $table->foreign('granted_by')
-                ->references('uuid')
-                ->on('users')
-                ->nullOnDelete();
         });
 
         // Create User Permissions Table
@@ -113,21 +109,12 @@ class CreatePermissionsTables implements MigrationInterface
             $table->index('expires_at');
             $table->index('granted_by');
 
-            // Add foreign keys
-            $table->foreign('user_uuid')
-                ->references('uuid')
-                ->on('users')
-                ->cascadeOnDelete();
-
+            // Foreign keys. user_uuid + granted_by are external principal ids — indexed only,
+            // no FK into users (design §2). Only the intra-package permission FK is kept.
             $table->foreign('permission_uuid')
                 ->references('uuid')
                 ->on('permissions')
                 ->cascadeOnDelete();
-
-            $table->foreign('granted_by')
-                ->references('uuid')
-                ->on('users')
-                ->nullOnDelete();
         });
 
         // Create Permission Audit Table

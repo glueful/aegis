@@ -78,21 +78,13 @@ class CreateRolesTables implements MigrationInterface
             $table->index('expires_at');
             $table->index('granted_by');
 
-            // Add foreign keys
-            $table->foreign('user_uuid')
-                ->references('uuid')
-                ->on('users')
-                ->cascadeOnDelete();
-
+            // Foreign keys. user_uuid + granted_by are EXTERNAL principal ids (the user store is
+            // a separate package) — indexed only, NO cross-package FK into users (design §2);
+            // existence is validated at assignment time. Only the intra-package role FK is kept.
             $table->foreign('role_uuid')
                 ->references('uuid')
                 ->on('roles')
                 ->cascadeOnDelete();
-
-            $table->foreign('granted_by')
-                ->references('uuid')
-                ->on('users')
-                ->nullOnDelete();
         });
     }
 

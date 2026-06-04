@@ -214,6 +214,32 @@ class UserRoleRepository extends BaseRepository
         return array_map(fn($role) => $role->getRoleUuid(), $userRoles);
     }
 
+    /**
+     * Active (non-expired) role slugs for a principal, via a single user_roles -> roles join
+     * (no N+1 — getUserRoles() returns UserRole models carrying only role_uuid). The user uuid is
+     * an external principal id (no FK); this is what IdentityClaimsProvider folds into claims.
+     *
+     * @return list<string>
+     */
+    public function roleSlugsForUser(string $userUuid): array
+    {
+        // QueryBuilder::where() only normalizes the 2-arg form when the 2nd arg is NOT a string,
+        // so a UUID string must use the explicit 3-arg operator form.
+        $currentTime = $this->db->getDriver()->formatDateTime();
+
+        $rows = $this->db->table('user_roles')
+            ->join('roles', 'user_roles.role_uuid', '=', 'roles.uuid')
+            ->where('user_roles.user_uuid', '=', $userUuid)
+            ->where(function ($q) use ($currentTime) {
+                $q->where('user_roles.expires_at', '>=', $currentTime)
+                  ->orWhereNull('user_roles.expires_at');
+            })
+            ->select(['roles.slug'])
+            ->get();
+
+        return array_values(array_column($rows, 'slug'));
+    }
+
     public function assignRole(string $userUuid, string $roleUuid, array $options = []): ?UserRole
     {
         // Check if assignment already exists
