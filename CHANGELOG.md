@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Implements the framework's `PermissionCatalogSyncInterface`: `syncCatalog()` idempotently persists the declared permission catalog (permissions + role grants via `replaceRolePermissions`), and `getManagedCatalog()` reports extension/app-managed permissions only.
+- `managed_by` column on the `roles` and `permissions` tables to distinguish catalog-synced rows from hand-created ones (drives stale detection / safe prune).
+
+### Fixed
+- `role_permissions` now has `updated_at`/`deleted_at` columns, required by the repository's soft-delete + updated-at lifecycle (assign/replace/revoke).
+- `PermissionRepository` invalidates its static slug cache on create (and adds `clearCache()`), preventing stale null-misses during write-then-read within a process.
+
 ### Planned
 - GraphQL API support for role and permission management
 - Advanced permission templating system
