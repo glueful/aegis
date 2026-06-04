@@ -58,6 +58,43 @@ class RoleRepository extends BaseRepository
         return $this->findRoleByUuid($uuid);
     }
 
+    /**
+     * Managed (extension/app-synced) roles only: managed_by IS NOT NULL.
+     *
+     * @return array<string, string> slug => managed_by
+     */
+    public function findManaged(): array
+    {
+        $rows = $this->db->table($this->table)->select(['slug', 'managed_by'])->get();
+        $out = [];
+        foreach ($rows as $row) {
+            if (($row['managed_by'] ?? null) !== null) {
+                $out[(string) $row['slug']] = (string) $row['managed_by'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Hard-delete managed roles (managed_by IS NOT NULL) whose slug is in $slugs.
+     * Hand-created roles (managed_by NULL) are never deleted, even if listed.
+     *
+     * @param string[] $slugs
+     * @return int rows deleted
+     */
+    public function deleteManagedBySlugs(array $slugs): int
+    {
+        if (count($slugs) === 0) {
+            return 0;
+        }
+        $toDelete = array_values(array_intersect($slugs, array_keys($this->findManaged())));
+        // QueryBuilder DELETE supports only simple conditions, so delete per slug.
+        foreach ($toDelete as $s) {
+            $this->db->table($this->table)->where(['slug' => $s])->delete();
+        }
+        return count($toDelete);
+    }
+
     public function findRoleByUuid(string $uuid): ?Role
     {
         // Check static cache first (works across all instances)

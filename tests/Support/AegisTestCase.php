@@ -53,7 +53,7 @@ abstract class AegisTestCase extends TestCase
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uuid TEXT, name TEXT, slug TEXT, description TEXT, category TEXT,
             resource_type TEXT, is_system INTEGER DEFAULT 0, managed_by TEXT,
-            metadata TEXT, created_at TEXT
+            metadata TEXT, created_at TEXT, deleted_at TEXT
         )');
         $pdo->exec('CREATE TABLE roles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +91,35 @@ abstract class AegisTestCase extends TestCase
 
     protected function permissionExists(string $slug): bool
     {
-        $stmt = $this->connection->getPDO()->prepare('SELECT COUNT(*) FROM permissions WHERE slug = ?');
+        // "Exists" = active (not soft-deleted), matching how the app sees the catalog.
+        $stmt = $this->connection->getPDO()->prepare(
+            'SELECT COUNT(*) FROM permissions WHERE slug = ? AND deleted_at IS NULL'
+        );
+        $stmt->execute([$slug]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /** @param array<string,mixed> $row */
+    protected function seedRole(array $row): void
+    {
+        $stmt = $this->connection->getPDO()->prepare(
+            'INSERT INTO roles (uuid, name, slug, managed_by, level, is_system, status)
+             VALUES (?,?,?,?,0,0,?)'
+        );
+        $stmt->execute([
+            $row['uuid'] ?? Utils::generateNanoID(),
+            $row['name'] ?? $row['slug'],
+            $row['slug'],
+            $row['managed_by'] ?? null,
+            'active',
+        ]);
+    }
+
+    protected function roleExists(string $slug): bool
+    {
+        $stmt = $this->connection->getPDO()->prepare(
+            'SELECT COUNT(*) FROM roles WHERE slug = ? AND deleted_at IS NULL'
+        );
         $stmt->execute([$slug]);
         return (int) $stmt->fetchColumn() > 0;
     }

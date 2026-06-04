@@ -43,6 +43,8 @@ class CreatePermissionsTables implements MigrationInterface
             $table->string('managed_by', 100)->nullable();
             $table->json('metadata')->nullable();
             $table->timestamp('created_at')->default('CURRENT_TIMESTAMP');
+            // Soft-delete support so catalog prune (and the repository's delete()) work consistently.
+            $table->timestamp('deleted_at')->nullable();
 
             // Add indexes
             $table->unique('uuid');

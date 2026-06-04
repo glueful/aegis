@@ -5,6 +5,8 @@ namespace Glueful\Extensions\Aegis;
 use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Interfaces\Permission\PermissionProviderInterface;
 use Glueful\Interfaces\Permission\PermissionCatalogSyncInterface;
+use Glueful\Interfaces\Permission\CatalogPruneInterface;
+use Glueful\Interfaces\Permission\RoleCatalogSyncInterface;
 use Glueful\Permissions\Catalog\SyncResult;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
@@ -28,7 +30,11 @@ use Glueful\Cache\CacheStore;
  * - Permission inheritance
  * - Scoped permissions
  */
-class AegisPermissionProvider implements PermissionProviderInterface, PermissionCatalogSyncInterface
+class AegisPermissionProvider implements
+    PermissionProviderInterface,
+    PermissionCatalogSyncInterface,
+    CatalogPruneInterface,
+    RoleCatalogSyncInterface
 {
     private ApplicationContext $context;
     private ?CacheStore $cache = null;
@@ -308,6 +314,24 @@ public function initialize(array $config = []): void
     public function getManagedCatalog(): array
     {
         return $this->getPermissionRepository()->findManaged();
+    }
+
+    /** @param string[] $slugs */
+    public function pruneCatalog(array $slugs): int
+    {
+        return $this->getPermissionRepository()->deleteManagedBySlugs($slugs);
+    }
+
+    /** @return array<string, string> */
+    public function getManagedRoles(): array
+    {
+        return $this->getRoleRepository()->findManaged();
+    }
+
+    /** @param string[] $roleSlugs */
+    public function pruneRoles(array $roleSlugs): int
+    {
+        return $this->getRoleRepository()->deleteManagedBySlugs($roleSlugs);
     }
 
     /**

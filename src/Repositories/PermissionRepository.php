@@ -92,6 +92,27 @@ class PermissionRepository extends BaseRepository
         return $out;
     }
 
+    /**
+     * Hard-delete managed permissions (managed_by IS NOT NULL) whose slug is in $slugs.
+     * Hand-created rows (managed_by NULL) are never deleted, even if listed.
+     *
+     * @param string[] $slugs
+     * @return int rows deleted
+     */
+    public function deleteManagedBySlugs(array $slugs): int
+    {
+        if (count($slugs) === 0) {
+            return 0;
+        }
+        $toDelete = array_values(array_intersect($slugs, array_keys($this->findManaged())));
+        // QueryBuilder DELETE supports only simple conditions, so delete per slug.
+        foreach ($toDelete as $s) {
+            $this->db->table($this->table)->where(['slug' => $s])->delete();
+            unset($this->permissionsCache['slug_' . $s], self::$globalPermissionsCache['slug_' . $s]);
+        }
+        return count($toDelete);
+    }
+
     public function findPermissionByUuid(string $uuid): ?Permission
     {
         $cacheKey = 'uuid_' . $uuid;
