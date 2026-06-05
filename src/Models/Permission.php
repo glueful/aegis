@@ -23,9 +23,13 @@ class Permission
     private ?string $resourceType;
     private bool $isSystem;
     private ?string $managedBy;
+    /** @var array<string, mixed> */
     private array $metadata;
     private string $createdAt;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         $this->uuid = $data['uuid'] ?? '';
@@ -122,23 +126,29 @@ class Permission
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getMetadata(): array
     {
         return $this->metadata;
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function setMetadata(array $metadata): self
     {
         $this->metadata = $metadata;
         return $this;
     }
 
-    public function getMetadataValue(string $key, $default = null)
+    public function getMetadataValue(string $key, mixed $default = null): mixed
     {
         return $this->metadata[$key] ?? $default;
     }
 
-    public function setMetadataValue(string $key, $value): self
+    public function setMetadataValue(string $key, mixed $value): self
     {
         $this->metadata[$key] = $value;
         return $this;
@@ -159,6 +169,9 @@ class Permission
         return $this->resourceType !== null;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -174,6 +187,9 @@ class Permission
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArrayForInsert(): array
     {
         return array_filter($this->toArray(), fn($value) => $value !== null);

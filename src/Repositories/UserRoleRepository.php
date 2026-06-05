@@ -27,9 +27,11 @@ class UserRoleRepository extends BaseRepository
     protected bool $hasUpdatedAt = false;
 
     // Cache to prevent duplicate queries within a single request
+    /** @var array<string, list<UserRole>> */
     private array $userRolesCache = [];
 
     // Static cache to prevent duplicate queries across all instances within a single request
+    /** @var array<string, list<UserRole>> */
     private static array $globalUserRolesCache = [];
 
     public function getTableName(): string
@@ -52,6 +54,9 @@ class UserRoleRepository extends BaseRepository
         return $data['uuid'];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function createUserRole(array $data): ?UserRole
     {
         $uuid = $this->create($data);
@@ -69,16 +74,23 @@ class UserRoleRepository extends BaseRepository
         return $result ? new UserRole($result[0]) : null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function update(string $uuid, array $data): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
     }
 
     public function delete(string $uuid): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<UserRole>
+     */
     public function findByUser(string $userUuid, array $filters = []): array
     {
         $query = $this->db->table($this->table)
@@ -103,6 +115,9 @@ class UserRoleRepository extends BaseRepository
         return array_map(fn($row) => new UserRole($row), $results);
     }
 
+    /**
+     * @return list<UserRole>
+     */
     public function findByRole(string $roleUuid): array
     {
         $results = $this->db->table($this->table)
@@ -128,6 +143,9 @@ class UserRoleRepository extends BaseRepository
         return $result ? new UserRole($result[0]) : null;
     }
 
+    /**
+     * @param array<string, mixed> $scope
+     */
     public function hasUserRole(string $userUuid, string $roleUuid, array $scope = []): bool
     {
         $query = $this->db->table($this->table)
@@ -164,6 +182,10 @@ class UserRoleRepository extends BaseRepository
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $scope
+     * @return list<UserRole>
+     */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
         // Create cache key based on user UUID and scope
@@ -208,6 +230,10 @@ class UserRoleRepository extends BaseRepository
         return $userRoles;
     }
 
+    /**
+     * @param array<string, mixed> $scope
+     * @return list<string>
+     */
     public function getUserRoleUuids(string $userUuid, array $scope = []): array
     {
         $userRoles = $this->getUserRoles($userUuid, $scope);
@@ -240,6 +266,9 @@ class UserRoleRepository extends BaseRepository
         return array_values(array_column($rows, 'slug'));
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function assignRole(string $userUuid, string $roleUuid, array $options = []): ?UserRole
     {
         // Check if assignment already exists
@@ -263,7 +292,7 @@ class UserRoleRepository extends BaseRepository
 
     public function revokeRole(string $userUuid, string $roleUuid): bool
     {
-        return $this->db->table($this->table)->where([
+        return (bool) $this->db->table($this->table)->where([
             'user_uuid' => $userUuid,
             'role_uuid' => $roleUuid
         ])->delete();
@@ -271,9 +300,12 @@ class UserRoleRepository extends BaseRepository
 
     public function revokeAllUserRoles(string $userUuid): bool
     {
-        return $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+        return (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
     }
 
+    /**
+     * @return list<UserRole>
+     */
     public function findExpiredRoles(): array
     {
         $currentTime = $this->db->getDriver()->formatDateTime();
@@ -312,6 +344,9 @@ class UserRoleRepository extends BaseRepository
         return $count;
     }
 
+    /**
+     * @return list<UserRole>
+     */
     public function findByGrantedBy(string $grantedByUuid): array
     {
         $results = $this->db->table($this->table)
@@ -323,6 +358,10 @@ class UserRoleRepository extends BaseRepository
         return array_map(fn($row) => new UserRole($row), $results);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<string>
+     */
     public function getUsersWithRole(string $roleUuid, array $filters = []): array
     {
         $query = $this->db->table($this->table)
@@ -342,6 +381,9 @@ class UserRoleRepository extends BaseRepository
         return array_column($results, 'user_uuid');
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     */
     public function countUserRoles(string $userUuid, array $filters = []): int
     {
         $query = $this->db->table($this->table)
@@ -358,6 +400,10 @@ class UserRoleRepository extends BaseRepository
         return $query->count();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<UserRole>
+     */
     public function findRoleAssignments(array $filters = []): array
     {
         $query = $this->db->table($this->table)->select($this->defaultFields);
@@ -388,10 +434,10 @@ class UserRoleRepository extends BaseRepository
      * Get paginated user role history
      *
      * @param string $userUuid User UUID to get history for
-     * @param array $filters Additional filters
+     * @param array<string, mixed> $filters Additional filters
      * @param int $page Page number (1-based)
      * @param int $perPage Number of items per page
-     * @return array Paginated results with metadata
+     * @return array<string, mixed> Paginated results with metadata
      */
     public function getUserRoleHistoryPaginated(
         string $userUuid,
@@ -505,9 +551,9 @@ class UserRoleRepository extends BaseRepository
     /**
      * Get user roles for multiple users efficiently
      *
-     * @param array $userUuids Array of user UUIDs
-     * @param array $scope Optional scope filter
-     * @return array Array of UserRole objects
+     * @param list<string> $userUuids Array of user UUIDs
+     * @param array<string, mixed> $scope Optional scope filter
+     * @return list<UserRole> Array of UserRole objects
      */
     public function getBulkUserRoles(array $userUuids, array $scope = []): array
     {

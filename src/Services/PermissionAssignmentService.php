@@ -32,6 +32,7 @@ class PermissionAssignmentService
     private RolePermissionRepository $rolePermissionRepository;
 
     // Cache to prevent duplicate queries within a single request
+    /** @var array<string, array<string, mixed>> */
     private array $cache = [
         'user_roles' => [],
         'user_permissions' => [],
@@ -54,6 +55,8 @@ class PermissionAssignmentService
 
     /**
      * Assign permission directly to user
+     *
+     * @param array<string, mixed> $options
      */
     public function assignPermissionToUser(
         string $userUuid,
@@ -112,6 +115,10 @@ class PermissionAssignmentService
 
     /**
      * Batch assign permissions to user
+     *
+     * @param list<array<string, mixed>> $permissions
+     * @param array<string, mixed> $globalOptions
+     * @return array<string, mixed>
      */
     public function batchAssignPermissions(string $userUuid, array $permissions, array $globalOptions = []): array
     {
@@ -159,6 +166,9 @@ class PermissionAssignmentService
 
     /**
      * Batch revoke permissions from user
+     *
+     * @param list<string> $permissionSlugs
+     * @return array<string, mixed>
      */
     public function batchRevokePermissions(string $userUuid, array $permissionSlugs): array
     {
@@ -200,6 +210,9 @@ class PermissionAssignmentService
 
     /**
      * Get user's direct permissions
+     *
+     * @param array<string, mixed> $filters
+     * @return list<array<string, mixed>>
      */
     public function getUserDirectPermissions(string $userUuid, array $filters = []): array
     {
@@ -222,14 +235,12 @@ class PermissionAssignmentService
 
         // Fetch all permissions in a single query
         $permissionsMap = [];
-        if (!empty($permissionUuids)) {
-            $permissionUuids = array_unique($permissionUuids); // Remove duplicates
-            $permissions = $this->permissionRepository->findByUuids($permissionUuids);
+        $permissionUuids = array_unique($permissionUuids); // Remove duplicates
+        $permissions = $this->permissionRepository->findByUuids($permissionUuids);
 
-            // Create a map for quick lookup
-            foreach ($permissions as $permission) {
-                $permissionsMap[$permission->getUuid()] = $permission;
-            }
+        // Create a map for quick lookup
+        foreach ($permissions as $permission) {
+            $permissionsMap[$permission->getUuid()] = $permission;
         }
 
         // Build the result array with permission data
@@ -256,6 +267,9 @@ class PermissionAssignmentService
 
     /**
      * Get user's effective permissions (direct + role-based)
+     *
+     * @param array<string, mixed> $scope
+     * @return array<string, list<array<string, mixed>>>
      */
     public function getUserEffectivePermissions(string $userUuid, array $scope = []): array
     {
@@ -302,6 +316,8 @@ class PermissionAssignmentService
 
     /**
      * Check if user has specific permission
+     *
+     * @param array<string, mixed> $context
      */
     public function userHasPermission(
         string $userUuid,
@@ -325,6 +341,8 @@ class PermissionAssignmentService
 
     /**
      * Create a new permission
+     *
+     * @param array<string, mixed> $data
      */
     public function createPermission(array $data): ?Permission
     {
@@ -352,6 +370,8 @@ class PermissionAssignmentService
 
     /**
      * Update an existing permission
+     *
+     * @param array<string, mixed> $data
      */
     public function updatePermission(string $uuid, array $data): bool
     {
@@ -424,6 +444,8 @@ class PermissionAssignmentService
 
     /**
      * Cleanup expired permissions
+     *
+     * @return array<string, mixed>
      */
     public function cleanupExpiredPermissions(): array
     {
@@ -438,6 +460,9 @@ class PermissionAssignmentService
 
     // Private helper methods
 
+    /**
+     * @param array<string, mixed> $context
+     */
     private function hasDirectPermission(
         string $userUuid,
         string $permissionUuid,
@@ -463,6 +488,9 @@ class PermissionAssignmentService
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     private function hasRoleBasedPermission(
         string $userUuid,
         string $permissionUuid,
@@ -500,6 +528,10 @@ class PermissionAssignmentService
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $scope
+     * @return array<string, list<array<string, mixed>>>
+     */
     private function getUserRolePermissions(string $userUuid, array $scope): array
     {
         $rolePermissions = [];
@@ -582,6 +614,8 @@ class PermissionAssignmentService
 
     /**
      * Get all permissions for a role
+     *
+     * @return list<array<string, mixed>>
      */
     private function getRolePermissions(string $roleUuid): array
     {
@@ -634,10 +668,10 @@ class PermissionAssignmentService
      * Get user's effective permissions using pre-fetched data to avoid duplicate queries
      *
      * @param string $userUuid
-     * @param array $directPermissions Already fetched direct permissions
-     * @param array $roles Already fetched user roles
-     * @param array $scope Optional scope filter
-     * @return array
+     * @param list<array<string, mixed>> $directPermissions Already fetched direct permissions
+     * @param list<array<string, mixed>> $roles Already fetched user roles
+     * @param array<string, mixed> $scope Optional scope filter
+     * @return array<string, list<array<string, mixed>>>
      */
     public function getUserEffectivePermissionsOptimized(
         string $userUuid,

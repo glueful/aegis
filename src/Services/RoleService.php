@@ -27,6 +27,8 @@ class RoleService
     /**
      * Cache for user roles to prevent duplicate queries
      * Format: ['userUuid:scopeHash' => roles]
+     *
+     * @var array<string, array<int, array<string, mixed>>>
      */
     private array $userRolesCache = [];
 
@@ -38,8 +40,10 @@ class RoleService
 
     /**
      * Create a new role
+     *
+     * @param array<string, mixed> $data
      */
-    public function createRole(array $data, string $createdBy = null): ?Role
+    public function createRole(array $data, ?string $createdBy = null): ?Role
     {
         // Validate required fields
         if (empty($data['name']) || empty($data['slug'])) {
@@ -83,8 +87,10 @@ class RoleService
 
     /**
      * Update an existing role
+     *
+     * @param array<string, mixed> $data
      */
-    public function updateRole(string $uuid, array $data, string $updatedBy = null): bool
+    public function updateRole(string $uuid, array $data, ?string $updatedBy = null): bool
     {
         $role = $this->roleRepository->findRoleByUuid($uuid);
         if (!$role) {
@@ -196,6 +202,8 @@ class RoleService
 
     /**
      * Assign role to user
+     *
+     * @param array<string, mixed> $options
      */
     public function assignRoleToUser(string $userUuid, string $roleUuid, array $options = []): bool
     {
@@ -241,6 +249,8 @@ class RoleService
 
     /**
      * Get role hierarchy
+     *
+     * @return list<Role>
      */
     public function getRoleHierarchy(string $roleUuid): array
     {
@@ -249,15 +259,21 @@ class RoleService
 
     /**
      * Get all roles with their hierarchy
+     *
+     * @return list<array<string, mixed>>
      */
     public function getRoleTree(): array
     {
+        /** @var list<Role> $allRoles */
         $allRoles = $this->roleRepository->findAll(['exclude_deleted' => true]);
         return $this->buildRoleTree($allRoles);
     }
 
     /**
      * Get user roles
+     *
+     * @param array<string, mixed> $scope
+     * @return list<array<string, mixed>>
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
@@ -307,6 +323,8 @@ class RoleService
 
     /**
      * Check if user has role
+     *
+     * @param array<string, mixed> $scope
      */
     public function userHasRole(string $userUuid, string $roleSlug, array $scope = []): bool
     {
@@ -353,6 +371,10 @@ class RoleService
         }
     }
 
+    /**
+     * @param list<Role> $roles
+     * @return list<array<string, mixed>>
+     */
     private function buildRoleTree(array $roles): array
     {
         $tree = [];
@@ -381,9 +403,9 @@ class RoleService
     /**
      * Get roles for multiple users efficiently (avoids N+1 queries)
      *
-     * @param array $userUuids Array of user UUIDs
-     * @param array $scope Optional scope filter
-     * @return array Associative array with user_uuid as key and array of roles as value
+     * @param list<string> $userUuids Array of user UUIDs
+     * @param array<string, mixed> $scope Optional scope filter
+     * @return array<string, list<array<string, mixed>>> Associative array with user_uuid as key and array of roles as value
      */
     public function getBulkUserRoles(array $userUuids, array $scope = []): array
     {

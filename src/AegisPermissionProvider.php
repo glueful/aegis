@@ -37,12 +37,14 @@ class AegisPermissionProvider implements
     RoleCatalogSyncInterface
 {
     private ApplicationContext $context;
+    /** @var CacheStore<mixed>|null */
     private ?CacheStore $cache = null;
     private ?RoleRepository $roleRepository = null;
     private ?PermissionRepository $permissionRepository = null;
     private ?UserRoleRepository $userRoleRepository = null;
     private ?UserPermissionRepository $userPermissionRepository = null;
     private ?RolePermissionRepository $rolePermissionRepository = null;
+    /** @var array<string, mixed> */
     private array $config = [
         'cache_ttl' => 3600,
         'cache_enabled' => true,
@@ -51,7 +53,9 @@ class AegisPermissionProvider implements
         'enable_inheritance' => true,
         'max_hierarchy_depth' => 10
     ];
+    /** @var array<string, array<string, list<string>>> */
     private array $permissionCache = [];
+    /** @var array<string, list<Role>> */
     private array $userRolesCache = [];
     private string $cachePrefix = 'rbac:';
     private bool $cacheEnabled = true;
@@ -156,7 +160,7 @@ public function initialize(array $config = []): void
         ]);
 
         // Check cache if enabled and context is cacheable (no dynamic constraints)
-        if ($this->cacheEnabled && $this->isContextCacheable($context)) {
+        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
             try {
                 $cached = $this->cache->get($cacheKey);
                 if ($cached !== null) {
@@ -180,7 +184,7 @@ public function initialize(array $config = []): void
         }
 
         // Cache the result if context is cacheable
-        if ($this->cacheEnabled && $this->isContextCacheable($context)) {
+        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
             try {
                 // Cache permission checks for a shorter time (15 minutes)
                 $this->cache->set($cacheKey, $result, 900);
@@ -201,7 +205,7 @@ public function initialize(array $config = []): void
 
         // Check distributed cache
         $cacheKey = $this->generateCacheKey('user_permissions', $userUuid);
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
                 $cached = $this->cache->get($cacheKey);
                 if ($cached !== null) {
@@ -227,9 +231,9 @@ public function initialize(array $config = []): void
 
         // Cache the result
         $this->permissionCache[$userUuid] = $permissions;
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
-                $this->cache->set($cacheKey, $permissions, $this->config['cache_ttl']);
+                $this->cache->set($cacheKey, $permissions, (int) $this->config['cache_ttl']);
             } catch (\Exception $e) {
                 error_log("Cache write failed for user permissions {$userUuid}: " . $e->getMessage());
             }
@@ -481,6 +485,10 @@ public function initialize(array $config = []): void
         return array_merge($commonResources, $result);
     }
 
+    /**
+     * @param array<int, array{permission?: string, resource?: string, options?: array<string, mixed>}> $permissions
+     * @param array<string, mixed> $options
+     */
     public function batchAssignPermissions(string $userUuid, array $permissions, array $options = []): bool
     {
         $success = true;
@@ -498,6 +506,9 @@ public function initialize(array $config = []): void
         return $success;
     }
 
+    /**
+     * @param array<int, array{permission?: string, resource?: string}> $permissions
+     */
     public function batchRevokePermissions(string $userUuid, array $permissions): bool
     {
         $success = true;
@@ -531,7 +542,7 @@ public function initialize(array $config = []): void
         }
 
         // Clear distributed cache if enabled
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
                 $userPermissionsKey = $this->generateCacheKey('user_permissions', $userUuid);
                 $userRolesKey = $this->generateCacheKey('user_roles', $userUuid);
@@ -553,7 +564,7 @@ public function initialize(array $config = []): void
         $this->permissionCache = [];
 
         // Clear distributed cache if enabled
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
                 // Clear all RBAC-related cache keys
                 $this->cache->deletePattern($this->cachePrefix . '*');
@@ -581,6 +592,7 @@ public function initialize(array $config = []): void
         ];
     }
 
+    /** @return array<string, mixed> */
     public function healthCheck(): array
     {
         $checks = [];
@@ -658,6 +670,10 @@ public function initialize(array $config = []): void
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $scope
+     * @return list<Role>
+     */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
         // Create cache key based on user UUID and scope
@@ -701,6 +717,7 @@ public function initialize(array $config = []): void
         return $roles;
     }
 
+    /** @param array<string, mixed> $scope */
     public function hasRole(string $userUuid, string $roleSlug, array $scope = []): bool
     {
         $role = $this->getRoleRepository()->findRoleBySlug($roleSlug);
@@ -713,6 +730,7 @@ public function initialize(array $config = []): void
 
     // Private helper methods
 
+    /** @param array<string, mixed> $context */
     private function hasDirectPermission(string $userUuid, string $permission, string $resource, array $context): bool
     {
         $permissionModel = $this->getPermissionRepository()->findPermissionBySlug($permission);
@@ -739,6 +757,7 @@ public function initialize(array $config = []): void
         return false;
     }
 
+    /** @param array<string, mixed> $context */
     private function hasRoleBasedPermission(
         string $userUuid,
         string $permission,
@@ -781,7 +800,7 @@ public function initialize(array $config = []): void
         ]);
 
         // Check cache if enabled
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
                 $cached = $this->cache->get($cacheKey);
                 if ($cached !== null) {
@@ -802,7 +821,7 @@ public function initialize(array $config = []): void
         );
 
         // Cache the result
-        if ($this->cacheEnabled) {
+        if ($this->cacheEnabled && $this->cache !== null) {
             try {
                 // Cache role permission checks for 30 minutes
                 $this->cache->set($cacheKey, $result, 1800);
@@ -814,6 +833,7 @@ public function initialize(array $config = []): void
         return $result;
     }
 
+    /** @return array<string, list<string>> */
     private function getDirectUserPermissions(string $userUuid): array
     {
         $userPermissions = $this->getUserPermissionRepository()->getUserPermissions($userUuid);
@@ -836,6 +856,7 @@ public function initialize(array $config = []): void
         return $permissions;
     }
 
+    /** @return array<string, list<string>> */
     private function getRoleBasedPermissions(string $userUuid): array
     {
         $permissions = [];
@@ -908,6 +929,7 @@ public function initialize(array $config = []): void
 
     // Cache helper methods
 
+    /** @param array<string, mixed> $context */
     private function generateCacheKey(string $type, string $identifier, array $context = []): string
     {
         $key = $this->cachePrefix . $type . ':' . $identifier;
@@ -921,7 +943,7 @@ public function initialize(array $config = []): void
 
     private function clearUserPermissionChecks(string $userUuid): void
     {
-        if (!$this->cacheEnabled) {
+        if (!$this->cacheEnabled || $this->cache === null) {
             return;
         }
 
@@ -934,6 +956,7 @@ public function initialize(array $config = []): void
         }
     }
 
+    /** @param array<string, mixed> $context */
     private function isContextCacheable(array $context): bool
     {
         // Don't cache if context contains time-sensitive data

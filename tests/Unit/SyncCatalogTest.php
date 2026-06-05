@@ -8,6 +8,7 @@ use Glueful\Extensions\Aegis\Tests\Support\AegisTestCase;
 
 final class SyncCatalogTest extends AegisTestCase
 {
+    /** @return array<string, string|null> */
     private function perm(string $slug, string $managedBy = 'vendor/blog', ?string $category = 'blog'): array
     {
         return [

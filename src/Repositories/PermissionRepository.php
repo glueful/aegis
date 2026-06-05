@@ -27,9 +27,11 @@ class PermissionRepository extends BaseRepository
     protected bool $hasUpdatedAt = false;
 
     // Cache to prevent duplicate permission lookups within a single request
+    /** @var array<string, Permission|null> */
     private array $permissionsCache = [];
 
     // Static cache to prevent duplicate queries across all instances within a single request
+    /** @var array<string, Permission|null> */
     private static array $globalPermissionsCache = [];
 
     public function getTableName(): string
@@ -52,6 +54,9 @@ class PermissionRepository extends BaseRepository
         return $data['uuid'];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function createPermission(array $data): ?Permission
     {
         $uuid = $this->create($data);
@@ -174,16 +179,23 @@ class PermissionRepository extends BaseRepository
         return $result ? new Permission($result[0]) : null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function update(string $uuid, array $data): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
     }
 
     public function delete(string $uuid): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<Permission>
+     */
     public function findAllPermissions(array $filters = []): array
     {
         $query = $this->db->table($this->table)->select($this->defaultFields);
@@ -211,6 +223,9 @@ class PermissionRepository extends BaseRepository
         return array_map(fn($row) => new Permission($row), $results);
     }
 
+    /**
+     * @return list<Permission>
+     */
     public function findByCategory(string $category): array
     {
         $results = $this->db->table($this->table)
@@ -222,6 +237,9 @@ class PermissionRepository extends BaseRepository
         return array_map(fn($row) => new Permission($row), $results);
     }
 
+    /**
+     * @return list<Permission>
+     */
     public function findByResourceType(string $resourceType): array
     {
         $results = $this->db->table($this->table)
@@ -233,11 +251,17 @@ class PermissionRepository extends BaseRepository
         return array_map(fn($row) => new Permission($row), $results);
     }
 
+    /**
+     * @return list<Permission>
+     */
     public function findSystemPermissions(): array
     {
         return $this->findAllPermissions(['is_system' => true]);
     }
 
+    /**
+     * @return list<string>
+     */
     public function getCategories(): array
     {
         $results = $this->db->table($this->table)
@@ -250,6 +274,9 @@ class PermissionRepository extends BaseRepository
         return array_column($results, 'category');
     }
 
+    /**
+     * @return list<string>
+     */
     public function getResourceTypes(): array
     {
         $results = $this->db->table($this->table)
@@ -292,6 +319,9 @@ class PermissionRepository extends BaseRepository
         return !empty($result);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     */
     public function countPermissions(array $filters = []): int
     {
         $query = $this->db->table($this->table);
@@ -312,6 +342,10 @@ class PermissionRepository extends BaseRepository
         return $query->count();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<Permission>
+     */
     public function searchPermissions(string $searchTerm, array $filters = []): array
     {
         $query = $this->db->table($this->table)->select($this->defaultFields);
@@ -343,6 +377,10 @@ class PermissionRepository extends BaseRepository
         return array_map(fn($row) => new Permission($row), $results);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
     public function findAllPaginated(array $filters = [], int $page = 1, int $perPage = 25): array
     {
         // Build conditions array for the base paginate method
@@ -395,6 +433,9 @@ class PermissionRepository extends BaseRepository
         );
     }
 
+    /**
+     * @return list<string>
+     */
     public function getUsersWithPermission(string $permissionUuid): array
     {
         $results = $this->db->table('user_permissions')
@@ -408,8 +449,8 @@ class PermissionRepository extends BaseRepository
     /**
      * Find permissions by multiple UUIDs efficiently
      *
-     * @param array $uuids Array of permission UUIDs
-     * @return array Array of Permission objects
+     * @param list<string> $uuids Array of permission UUIDs
+     * @return list<Permission> Array of Permission objects
      */
     public function findByUuids(array $uuids): array
     {
