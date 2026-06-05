@@ -35,7 +35,7 @@ class RolePermissionRepository extends BaseRepository
      *
      * @param string $roleUuid Role UUID
      * @param string $permissionUuid Permission UUID
-     * @param array $options Assignment options
+     * @param array<string, mixed> $options Assignment options
      * @return RolePermission|null Created assignment
      */
     public function assignPermissionToRole(
@@ -110,8 +110,8 @@ class RolePermissionRepository extends BaseRepository
      * Get all permissions for a role
      *
      * @param string $roleUuid Role UUID
-     * @param array $filters Optional filters
-     * @return array Role permissions
+     * @param array<string, mixed> $filters Optional filters
+     * @return list<RolePermission> Role permissions
      */
     public function getRolePermissions(string $roleUuid, array $filters = []): array
     {
@@ -136,7 +136,7 @@ class RolePermissionRepository extends BaseRepository
      * Get all roles that have a specific permission
      *
      * @param string $permissionUuid Permission UUID
-     * @return array Roles with this permission
+     * @return list<RolePermission> Roles with this permission
      */
     public function getRolesWithPermission(string $permissionUuid): array
     {
@@ -149,7 +149,7 @@ class RolePermissionRepository extends BaseRepository
      *
      * @param string $roleUuid Role UUID
      * @param string $permissionUuid Permission UUID
-     * @param array $context Optional context for checking
+     * @param array<string, mixed> $context Optional context for checking
      * @return bool Has permission
      */
     public function roleHasPermission(string $roleUuid, string $permissionUuid, array $context = []): bool
@@ -197,9 +197,9 @@ class RolePermissionRepository extends BaseRepository
      * Batch assign permissions to role
      *
      * @param string $roleUuid Role UUID
-     * @param array $permissionUuids Array of permission UUIDs
-     * @param array $options Assignment options
-     * @return array Results
+     * @param list<string> $permissionUuids Array of permission UUIDs
+     * @param array<string, mixed> $options Assignment options
+     * @return array<string, mixed> Results
      */
     public function batchAssignPermissions(string $roleUuid, array $permissionUuids, array $options = []): array
     {
@@ -226,8 +226,8 @@ class RolePermissionRepository extends BaseRepository
      * Batch revoke permissions from role
      *
      * @param string $roleUuid Role UUID
-     * @param array $permissionUuids Array of permission UUIDs
-     * @return array Results
+     * @param list<string> $permissionUuids Array of permission UUIDs
+     * @return array<string, mixed> Results
      */
     public function batchRevokePermissions(string $roleUuid, array $permissionUuids): array
     {
@@ -251,8 +251,8 @@ class RolePermissionRepository extends BaseRepository
      * Replace all permissions for a role
      *
      * @param string $roleUuid Role UUID
-     * @param array $permissionUuids New permission UUIDs
-     * @param array $options Assignment options
+     * @param list<string> $permissionUuids New permission UUIDs
+     * @param array<string, mixed> $options Assignment options
      * @return bool Success status
      */
     public function replaceRolePermissions(string $roleUuid, array $permissionUuids, array $options = []): bool
@@ -298,7 +298,7 @@ class RolePermissionRepository extends BaseRepository
      * Get role permission statistics
      *
      * @param string $roleUuid Role UUID
-     * @return array Statistics
+     * @return array<string, int> Statistics
      */
     public function getRolePermissionStats(string $roleUuid): array
     {
@@ -317,8 +317,8 @@ class RolePermissionRepository extends BaseRepository
     /**
      * Convert array data to RolePermission models
      *
-     * @param array $data Array of role permission data
-     * @return array Array of RolePermission models
+     * @param list<array<string, mixed>> $data Array of role permission data
+     * @return list<RolePermission> Array of RolePermission models
      */
     private function toModels(array $data): array
     {
@@ -327,6 +327,9 @@ class RolePermissionRepository extends BaseRepository
         }, $data);
     }
 
+    /**
+     * @param array<string, mixed> $filter
+     */
     private function matchesResourceFilter(array $filter, string $resource): bool
     {
         if (empty($filter['resource'])) {
@@ -347,6 +350,10 @@ class RolePermissionRepository extends BaseRepository
         return (bool) preg_match('/^' . $pattern . '$/', $resource);
     }
 
+    /**
+     * @param array<string, mixed> $constraints
+     * @param array<string, mixed> $context
+     */
     private function satisfiesConstraints(array $constraints, array $context): bool
     {
         foreach ($constraints as $key => $constraint) {
@@ -377,6 +384,10 @@ class RolePermissionRepository extends BaseRepository
         return true;
     }
 
+    /**
+     * @param mixed $contextValue
+     * @param mixed $constraintValue
+     */
     private function evaluateOperator($contextValue, string $operator, $constraintValue): bool
     {
         switch ($operator) {

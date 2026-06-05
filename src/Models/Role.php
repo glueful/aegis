@@ -23,12 +23,16 @@ class Role
     private ?string $parentUuid;
     private int $level;
     private bool $isSystem;
+    /** @var array<string, mixed> */
     private array $metadata;
     private string $status;
     private string $createdAt;
     private ?string $updatedAt;
     private ?string $deletedAt;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         $this->uuid = $data['uuid'] ?? '';
@@ -122,23 +126,29 @@ class Role
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getMetadata(): array
     {
         return $this->metadata;
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function setMetadata(array $metadata): self
     {
         $this->metadata = $metadata;
         return $this;
     }
 
-    public function getMetadataValue(string $key, $default = null)
+    public function getMetadataValue(string $key, mixed $default = null): mixed
     {
         return $this->metadata[$key] ?? $default;
     }
 
-    public function setMetadataValue(string $key, $value): self
+    public function setMetadataValue(string $key, mixed $value): self
     {
         $this->metadata[$key] = $value;
         return $this;
@@ -185,6 +195,9 @@ class Role
         return $this->parentUuid !== null;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -203,6 +216,9 @@ class Role
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArrayForInsert(): array
     {
         $data = $this->toArray();

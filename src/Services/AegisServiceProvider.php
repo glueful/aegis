@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Glueful\Extensions\Aegis\Services;
 
 use Glueful\Bootstrap\ApplicationContext;
+use Glueful\Database\Migrations\MigrationPriority;
 use Glueful\Extensions\ServiceProvider;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
+use Glueful\Extensions\Aegis\IdentityClaimsProvider;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
@@ -30,8 +32,9 @@ class AegisServiceProvider extends ServiceProvider
     {
         if (self::$cachedVersion === null) {
             $path = __DIR__ . '/../../composer.json';
-            $composer = json_decode(file_get_contents($path), true);
-            self::$cachedVersion = $composer['version'] ?? '0.0.0';
+            $contents = file_get_contents($path);
+            $composer = $contents !== false ? json_decode($contents, true) : null;
+            self::$cachedVersion = (is_array($composer) ? ($composer['version'] ?? null) : null) ?? '0.0.0';
         }
 
         return self::$cachedVersion;
@@ -65,6 +68,16 @@ class AegisServiceProvider extends ServiceProvider
             AuditService::class => ['class' => AuditService::class, 'shared' => true, 'autowire' => true],
 
             AegisPermissionProvider::class => ['class' => AegisPermissionProvider::class, 'shared' => true, 'autowire' => true],
+
+            // Folds Aegis role claims into the authenticated identity post-auth. Tagged
+            // 'identity.claims_provider' so core's IdentityResolver collects + invokes it (same
+            // mechanism as console.commands). Needs UserRoleRepository injected.
+            IdentityClaimsProvider::class => [
+                'class' => IdentityClaimsProvider::class,
+                'shared' => true,
+                'arguments' => ['@' . UserRoleRepository::class],
+                'tags' => ['identity.claims_provider'],
+            ],
 
             // Controllers
             PermissionController::class => [
@@ -115,6 +128,14 @@ class AegisServiceProvider extends ServiceProvider
             error_log('[Aegis] metadata registration failed: ' . $e->getMessage());
         }
 
+        // 1.5) Discover CLI commands (e.g. aegis:bootstrap-admin) before any early-return below —
+        //      the bootstrap command is run precisely when RBAC isn't fully set up yet.
+        try {
+            $this->discoverCommands('Glueful\\Extensions\\Aegis\\Console', __DIR__ . '/../Console');
+        } catch (\Throwable $e) {
+            error_log('[Aegis] command discovery failed: ' . $e->getMessage());
+        }
+
         // 2) Load routes (executes file) — guard to avoid aborting boot
         try {
             $this->loadRoutesFrom(__DIR__ . '/../routes.php');
@@ -126,9 +147,14 @@ class AegisServiceProvider extends ServiceProvider
             }
         }
 
-        // 3) Register migrations directory (low risk)
+        // 3) Register migrations directory (low risk). DEPENDENT priority orders Aegis after
+        //    glueful/users (IDENTITY) and the app (DEFAULT); source records 'glueful/aegis'.
         try {
-            $this->loadMigrationsFrom(dirname(__DIR__, 2) . '/migrations');
+            $this->loadMigrationsFrom(
+                dirname(__DIR__, 2) . '/migrations',
+                MigrationPriority::DEPENDENT,
+                'glueful/aegis'
+            );
         } catch (\Throwable $e) {
             error_log('[Aegis] Failed to register migrations: ' . $e->getMessage());
         }

@@ -36,6 +36,9 @@ class CreateRolesTables implements MigrationInterface
             $table->string('parent_uuid', 12)->nullable();
             $table->integer('level')->default(0);
             $table->boolean('is_system')->default(false);
+            // Composer package name of the declarer for catalog-synced roles; NULL for
+            // hand-created (API/UI) rows. Drives stale detection / safe prune.
+            $table->string('managed_by', 100)->nullable();
             $table->json('metadata')->nullable();
             $table->enum('status', ['active', 'inactive'], 'active');
             $table->timestamp('created_at')->default('CURRENT_TIMESTAMP');
@@ -75,21 +78,13 @@ class CreateRolesTables implements MigrationInterface
             $table->index('expires_at');
             $table->index('granted_by');
 
-            // Add foreign keys
-            $table->foreign('user_uuid')
-                ->references('uuid')
-                ->on('users')
-                ->cascadeOnDelete();
-
+            // Foreign keys. user_uuid + granted_by are EXTERNAL principal ids (the user store is
+            // a separate package) — indexed only, NO cross-package FK into users (design §2);
+            // existence is validated at assignment time. Only the intra-package role FK is kept.
             $table->foreign('role_uuid')
                 ->references('uuid')
                 ->on('roles')
                 ->cascadeOnDelete();
-
-            $table->foreign('granted_by')
-                ->references('uuid')
-                ->on('users')
-                ->nullOnDelete();
         });
     }
 

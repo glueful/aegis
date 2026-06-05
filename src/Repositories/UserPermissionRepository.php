@@ -27,6 +27,7 @@ class UserPermissionRepository extends BaseRepository
     protected bool $hasUpdatedAt = false;
 
     // Cache to prevent duplicate queries within a single request
+    /** @var array<string, list<UserPermission>> */
     private array $userPermissionsCache = [];
 
     public function getTableName(): string
@@ -49,6 +50,9 @@ class UserPermissionRepository extends BaseRepository
         return $data['uuid'];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function createUserPermission(array $data): ?UserPermission
     {
         $uuid = $this->create($data);
@@ -66,16 +70,23 @@ class UserPermissionRepository extends BaseRepository
         return $result ? new UserPermission($result[0]) : null;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function update(string $uuid, array $data): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
     }
 
     public function delete(string $uuid): bool
     {
-        return $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
+        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return list<UserPermission>
+     */
     public function findByUser(string $userUuid, array $filters = []): array
     {
         // Create cache key based on user UUID and filters
@@ -112,6 +123,9 @@ class UserPermissionRepository extends BaseRepository
         return $userPermissions;
     }
 
+    /**
+     * @return list<UserPermission>
+     */
     public function findByPermission(string $permissionUuid): array
     {
         $results = $this->db->table($this->table)
@@ -137,6 +151,9 @@ class UserPermissionRepository extends BaseRepository
         return $result ? new UserPermission($result[0]) : null;
     }
 
+    /**
+     * @param array<string, mixed> $resourceContext
+     */
     public function hasUserPermission(string $userUuid, string $permissionUuid, array $resourceContext = []): bool
     {
         $query = $this->db->table($this->table)
@@ -173,6 +190,10 @@ class UserPermissionRepository extends BaseRepository
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     * @return list<UserPermission>
+     */
     public function getUserPermissions(string $userUuid, array $context = []): array
     {
         $query = $this->db->table($this->table)
@@ -201,7 +222,7 @@ class UserPermissionRepository extends BaseRepository
 
     public function revokeUserPermission(string $userUuid, string $permissionUuid): bool
     {
-        return $this->db->table($this->table)->where([
+        return (bool) $this->db->table($this->table)->where([
             'user_uuid' => $userUuid,
             'permission_uuid' => $permissionUuid
         ])->delete();
@@ -209,9 +230,12 @@ class UserPermissionRepository extends BaseRepository
 
     public function revokeAllUserPermissions(string $userUuid): bool
     {
-        return $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+        return (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
     }
 
+    /**
+     * @return list<UserPermission>
+     */
     public function findExpiredPermissions(): array
     {
         $currentTime = $this->db->getDriver()->formatDateTime();
@@ -249,6 +273,9 @@ class UserPermissionRepository extends BaseRepository
         return $count;
     }
 
+    /**
+     * @return list<UserPermission>
+     */
     public function findByGrantedBy(string $grantedByUuid): array
     {
         $results = $this->db->table($this->table)
@@ -260,6 +287,9 @@ class UserPermissionRepository extends BaseRepository
         return array_map(fn($row) => new UserPermission($row), $results);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     */
     public function countUserPermissions(string $userUuid, array $filters = []): int
     {
         $query = $this->db->table($this->table)
@@ -276,6 +306,9 @@ class UserPermissionRepository extends BaseRepository
         return $query->count();
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     */
     public function countAllUserPermissions(array $filters = []): int
     {
         $query = $this->db->table($this->table);

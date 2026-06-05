@@ -34,12 +34,12 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary List all roles
          * @description Retrieves a list of all roles with optional filtering and pagination
          * @requiresAuth true
-         * @param page query integer false "Page number for pagination (default: 1)"
-         * @param per_page query integer false "Number of items per page (default: 25)"
-         * @param search query string false "Search term for role name or slug"
-         * @param status query string false "Filter by role status (active, inactive)"
-         * @param level query integer false "Filter by role hierarchy level"
-         * @param tree query boolean false "Return roles as hierarchical tree structure"
+         * @queryParam page:integer="Page number for pagination (default: 1)"
+         * @queryParam per_page:integer="Number of items per page (default: 25)"
+         * @queryParam search:string="Search term for role name or slug"
+         * @queryParam status:string="Filter by role status (active, inactive)"
+         * @queryParam level:integer="Filter by role hierarchy level"
+         * @queryParam tree:boolean="Return roles as hierarchical tree structure"
          * @response 200 application/json "Roles retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -115,7 +115,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get role details
          * @description Retrieves detailed information about a specific role
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
          * @response 200 application/json "Role details retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -170,7 +169,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Update role
          * @description Updates an existing role's properties
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
          * @requestBody name:string="Role name"
          *              description:string="Role description"
          *              parent_uuid:string="Parent role UUID"
@@ -189,8 +187,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Delete role
          * @description Deletes a role with optional force deletion
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
-         * @param force query boolean false "Force delete even if assigned to users or has children"
+         * @queryParam force:boolean="Force delete even if assigned to users or has children"
          * @response 200 application/json "Role deleted successfully"
          * @response 400 application/json "Cannot delete role (has dependencies)"
          * @response 403 application/json "Permission denied"
@@ -204,7 +201,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Assign role to user
          * @description Assigns a role to a specific user
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
          * @requestBody user_uuid:string="User UUID"
          *              scope:array="Assignment scope"
          *              expires_at:string="Expiration timestamp"
@@ -223,7 +219,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Revoke role from user
          * @description Revokes a role from a specific user
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
          * @requestBody user_uuid:string="User UUID" {required=user_uuid}
          * @response 200 application/json "Role revoked successfully"
          * @response 400 application/json "Invalid request format"
@@ -238,9 +233,8 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get users with role
          * @description Retrieves all users assigned to a specific role
          * @requiresAuth true
-         * @param uuid path string true "Role UUID"
-         * @param page query integer false "Page number for pagination"
-         * @param per_page query integer false "Number of items per page"
+         * @queryParam page:integer="Page number for pagination"
+         * @queryParam per_page:integer="Number of items per page"
          * @response 200 application/json "Role users retrieved successfully" {
          *   data:array=[{
          *     user_uuid:string="User UUID",
@@ -269,7 +263,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Bulk assign role to users
          * @description Assigns a role to multiple users
          * @requiresAuth true
-         * @param role_uuid path string true "Role UUID"
          * @requestBody user_uuids:array=[string="User UUIDs"]
          *              scope:array="Assignment scope"
          *              expires_at:string="Expiration timestamp"
@@ -288,7 +281,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Bulk revoke role from users
          * @description Revokes a role from multiple users
          * @requiresAuth true
-         * @param role_uuid path string true "Role UUID"
          * @requestBody user_uuids:array=[string="User UUIDs"] {required=user_uuids}
          * @response 200 application/json "Bulk role revocation completed"
          * @response 400 application/json "Invalid request format"
@@ -306,11 +298,11 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary List all permissions
          * @description Retrieves a list of all permissions with optional filtering and pagination
          * @requiresAuth true
-         * @param page query integer false "Page number for pagination (default: 1)"
-         * @param per_page query integer false "Number of items per page (default: 25)"
-         * @param search query string false "Search term for permission name or slug"
-         * @param category query string false "Filter by permission category"
-         * @param resource_type query string false "Filter by resource type"
+         * @queryParam page:integer="Page number for pagination (default: 1)"
+         * @queryParam per_page:integer="Number of items per page (default: 25)"
+         * @queryParam search:string="Search term for permission name or slug"
+         * @queryParam category:string="Filter by permission category"
+         * @queryParam resource_type:string="Filter by resource type"
          * @response 200 application/json "Permissions retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -405,7 +397,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get permission details
          * @description Retrieves detailed information about a specific permission including user count
          * @requiresAuth true
-         * @param uuid path string true "Permission UUID"
          * @response 200 application/json "Permission details retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -453,7 +444,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Update permission
          * @description Updates an existing permission's properties
          * @requiresAuth true
-         * @param uuid path string true "Permission UUID"
          * @requestBody name:string="Permission name"
          *              description:string="Permission description"
          *              category:string="Permission category"
@@ -471,8 +461,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Delete permission
          * @description Deletes a permission with optional force deletion
          * @requiresAuth true
-         * @param uuid path string true "Permission UUID"
-         * @param force query boolean false "Force delete even if assigned to users"
+         * @queryParam force:boolean="Force delete even if assigned to users"
          * @response 200 application/json "Permission deleted successfully"
          * @response 400 application/json "Cannot delete permission (still assigned)"
          * @response 403 application/json "Permission denied"
@@ -486,7 +475,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Assign permission to user
          * @description Assigns a permission directly to a user
          * @requiresAuth true
-         * @param uuid path string true "Permission UUID"
          * @requestBody user_uuid:string="User UUID"
          *              resource:string="Resource filter"
          *              expires_at:string="Expiration timestamp"
@@ -506,7 +494,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Revoke permission from user
          * @description Revokes a permission from a specific user
          * @requiresAuth true
-         * @param uuid path string true "Permission UUID"
          * @requestBody user_uuid:string="User UUID" {required=user_uuid}
          * @response 200 application/json "Permission revoked successfully"
          * @response 400 application/json "Invalid request format"
@@ -555,8 +542,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get user roles
          * @description Retrieves all roles assigned to a specific user
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param scope query string false "JSON-encoded scope filter"
+         * @queryParam scope:string="JSON-encoded scope filter"
          * @response 200 application/json "User roles retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -583,7 +569,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Assign roles to user
          * @description Assigns multiple roles to a user
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
          * @requestBody role_uuids:array=[string="Role UUIDs"]
          *              scope:array="Assignment scope"
          *              expires_at:string="Expiration timestamp"
@@ -601,7 +586,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Replace user roles
          * @description Replaces all user roles with the specified set
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
          * @requestBody role_uuids:array=[string="Role UUIDs"]
          *              scope:array="Assignment scope"
          *              expires_at:string="Expiration timestamp"
@@ -619,8 +603,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Revoke specific role from user
          * @description Revokes a specific role from a user
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param role_uuid path string true "Role UUID"
          * @response 200 application/json "Role revoked successfully"
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "User or role not found"
@@ -633,8 +615,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get user direct permissions
          * @description Retrieves all permissions directly assigned to a user (not from roles)
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param active_only query boolean false "Return only active permissions (default: true)"
+         * @queryParam active_only:boolean="Return only active permissions (default: true)"
          * @response 200 application/json "User permissions retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -662,8 +643,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get user effective permissions
          * @description Retrieves all effective permissions for a user (direct + role-based)
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param scope query string false "JSON-encoded scope filter"
+         * @queryParam scope:string="JSON-encoded scope filter"
          * @response 200 application/json "User effective permissions retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -691,8 +671,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get user access overview
          * @description Retrieves complete access overview for a user (roles + permissions)
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param scope query string false "JSON-encoded scope filter"
+         * @queryParam scope:string="JSON-encoded scope filter"
          * @response 200 application/json "User access overview retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -730,10 +709,9 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Get user role history
          * @description Retrieves role assignment history for a user with pagination
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
-         * @param page query integer false "Page number for pagination (default: 1)"
-         * @param per_page query integer false "Number of items per page (default: 25)"
-         * @param include_deleted query boolean false "Include deleted role assignments (default: true)"
+         * @queryParam page:integer="Page number for pagination (default: 1)"
+         * @queryParam per_page:integer="Number of items per page (default: 25)"
+         * @queryParam include_deleted:boolean="Include deleted role assignments (default: true)"
          * @response 200 application/json "User role history retrieved successfully" {
          *   success:boolean="true",
          *   message:string="Success message",
@@ -766,7 +744,6 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @summary Check if user has role
          * @description Checks if a user has a specific role
          * @requiresAuth true
-         * @param user_uuid path string true "User UUID"
          * @requestBody role_slug:string="Role slug to check"
          *              scope:array="Scope filter"
          *              {required=role_slug}

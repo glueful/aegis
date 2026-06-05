@@ -16,7 +16,9 @@ class RolePermission
     private string $uuid;
     private string $roleUuid;
     private string $permissionUuid;
+    /** @var array<string, mixed>|null */
     private ?array $resourceFilter = null;
+    /** @var array<string, mixed>|null */
     private ?array $constraints = null;
     private ?string $grantedBy = null;
     private ?string $expiresAt = null;
@@ -25,7 +27,7 @@ class RolePermission
     /**
      * Constructor
      *
-     * @param array $data Role permission data
+     * @param array<string, mixed> $data Role permission data
      */
     public function __construct(array $data = [])
     {
@@ -94,7 +96,7 @@ class RolePermission
     /**
      * Get resource filter
      *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public function getResourceFilter(): ?array
     {
@@ -104,7 +106,7 @@ class RolePermission
     /**
      * Get constraints
      *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public function getConstraints(): ?array
     {
@@ -168,7 +170,7 @@ class RolePermission
     /**
      * Check if resource matches filter
      *
-     * @param array $context Resource context
+     * @param array<string, mixed> $context Resource context
      * @return bool
      */
     public function matchesResource(array $context): bool
@@ -202,7 +204,7 @@ class RolePermission
     /**
      * Check if context satisfies constraints
      *
-     * @param array $context Context to check
+     * @param array<string, mixed> $context Context to check
      * @return bool
      */
     public function satisfiesConstraints(array $context): bool
@@ -227,7 +229,7 @@ class RolePermission
     /**
      * Convert to array
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
@@ -249,7 +251,7 @@ class RolePermission
     /**
      * Create from database row
      *
-     * @param array $row Database row
+     * @param array<string, mixed> $row Database row
      * @return self
      */
     public static function fromRow(array $row): self
@@ -259,7 +261,7 @@ class RolePermission
 
     // Private helper methods
 
-    private function evaluateConstraint($value, $constraint): bool
+    private function evaluateConstraint(mixed $value, mixed $constraint): bool
     {
         // Array constraint - value must be in array
         if (is_array($constraint)) {

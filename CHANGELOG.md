@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with external identity providers (LDAP, Active Directory)
 - Real-time permission change notifications
 
+## [1.6.0] - 2026-06-05 — Bootstrap Admin & Framework 1.50 Compatibility
+
+### Added
+- **`aegis:bootstrap-admin` CLI command** (`src/Console/BootstrapAdminCommand.php`): first-admin bootstrap for a fresh install. Syncs the declared permission catalog (same mechanics as `permissions:sync`), then creates/reuses a role and grants it the requested permissions and assigns it to a user. Options: `--user` (required; UUID/email/username resolved via `UserProviderInterface`, so Aegis stays decoupled from `glueful/users`), `--role=admin`, repeatable `--permission` (**default `users.read`** — enough to unlock `GET /users` / `GET /users/{uuid}` without minting a super-admin), `--all-catalog` (grant every catalog permission), `--dry-run`, `--yes`. Logic lives in `Services\BootstrapAdminService` (permission grants are additive/idempotent; unknown permissions and unresolved users fail loudly). Command discovery wired in `AegisServiceProvider::boot()` before the RBAC-tables early-return so it's available pre-setup.
+- Implements the framework's `PermissionCatalogSyncInterface`: `syncCatalog()` idempotently persists the declared permission catalog (permissions + role grants via `replaceRolePermissions`), and `getManagedCatalog()` reports extension/app-managed permissions only.
+- `managed_by` column on the `roles` and `permissions` tables to distinguish catalog-synced rows from hand-created ones (drives stale detection / safe prune).
+- Implements the framework's `CatalogPruneInterface` and `RoleCatalogSyncInterface` (Phase 2): `pruneCatalog()`, `getManagedRoles()`, `pruneRoles()` — powering `permissions:diff`/`permissions:sync --prune`. Permission/role repositories gain `findManaged()`/`deleteManagedBySlugs()` (managed-only, soft-delete).
+
+### Changed
+- **Minimum framework raised to `glueful/framework >=1.50.2`** (`require-dev` `^1.50.2`); previously `>=1.50.1`. Route docblocks migrated to the editor-clean **`@queryParam name:type="…"`** tag, which `CommentsDocGenerator` parses into the OpenAPI spec as of framework 1.50.2 (the prior positional `@param … query …` form tripped IDE/Intelephense P1133 false positives). Redundant path-parameter docblocks were removed — path params auto-derive from the route URL.
+- **`composer analyse` now passes clean at PHPStan level 8** (previously 280 errors, never green). Added accurate array value-type annotations across models, repositories, and services; cast int row-counts to `bool` in repository `update()`/`delete()`/`revoke*()` methods (the declared `: bool` contract was already coercing — no behavior change). No runtime behavior change.
+
+### Removed
+- **Dead `src/Validation/` constraint layer** (`Constraints/HasPermission`, `Constraints/ValidRole`, and their `ConstraintValidators`). They extended `Glueful\Validation\Constraints\AbstractConstraint` (removed in the framework's validation rewrite) and `Symfony\Component\Validator\ConstraintValidator` (never a declared dependency), and were referenced nowhere — dead code that would fatal at autoload if ever used.
+
+### Fixed
+- **Cache null-safety in `AegisPermissionProvider`.** The optional permission cache (`CacheStore|null`) is now null-guarded on every read/write, so the `cache_enabled=false` path can no longer trigger a null-method-call; a null cache behaves as a no-op (cache miss), exactly as intended.
+- `role_permissions` now has `updated_at`/`deleted_at` columns, required by the repository's soft-delete + updated-at lifecycle (assign/replace/revoke).
+- `permissions` table gains `deleted_at` for soft-delete consistency (catalog prune and `delete()`).
+- `PermissionRepository` invalidates its static slug cache on create/delete (and adds `clearCache()`), preventing stale null-misses during write-then-read within a process.
+
 ## [1.5.0] - 2026-02-09
 
 ### Changed

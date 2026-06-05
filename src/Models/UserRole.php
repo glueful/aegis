@@ -18,11 +18,15 @@ class UserRole
     private string $uuid;
     private string $userUuid;
     private string $roleUuid;
+    /** @var array<string, mixed>|null */
     private ?array $scope;
     private ?string $grantedBy;
     private ?string $expiresAt;
     private string $createdAt;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         $this->uuid = $data['uuid'] ?? '';
@@ -67,23 +71,29 @@ class UserRole
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function getScope(): ?array
     {
         return $this->scope;
     }
 
+    /**
+     * @param array<string, mixed>|null $scope
+     */
     public function setScope(?array $scope): self
     {
         $this->scope = $scope;
         return $this;
     }
 
-    public function getScopeValue(string $key, $default = null)
+    public function getScopeValue(string $key, mixed $default = null): mixed
     {
         return $this->scope[$key] ?? $default;
     }
 
-    public function setScopeValue(string $key, $value): self
+    public function setScopeValue(string $key, mixed $value): self
     {
         if ($this->scope === null) {
             $this->scope = [];
@@ -134,7 +144,7 @@ class UserRole
         if (!$this->hasExpiry()) {
             return false;
         }
-        return strtotime($this->expiresAt) < time();
+        return strtotime((string) $this->expiresAt) < time();
     }
 
     public function isActive(): bool
@@ -142,6 +152,9 @@ class UserRole
         return !$this->isExpired();
     }
 
+    /**
+     * @param array<string, mixed> $requiredScope
+     */
     public function matchesScope(array $requiredScope): bool
     {
         if (!$this->hasScope()) {
@@ -157,6 +170,9 @@ class UserRole
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -170,6 +186,9 @@ class UserRole
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArrayForInsert(): array
     {
         return array_filter($this->toArray(), fn($value) => $value !== null);

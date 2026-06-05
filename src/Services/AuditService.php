@@ -33,7 +33,7 @@ class AuditService
     /**
      * Log role created event
      *
-     * @param array $roleData Role data that was created
+     * @param array<string, mixed> $roleData Role data that was created
      * @param string|null $createdBy UUID of user who created the role
      * @return void
      */
@@ -59,8 +59,8 @@ class AuditService
      * Log role updated event
      *
      * @param string $roleUuid Role UUID
-     * @param array $oldData Previous role data
-     * @param array $newData Updated role data
+     * @param array<string, mixed> $oldData Previous role data
+     * @param array<string, mixed> $newData Updated role data
      * @param string|null $updatedBy UUID of user who updated the role
      * @return void
      */
@@ -88,7 +88,7 @@ class AuditService
      * Log role deleted event
      *
      * @param string $roleUuid Role UUID
-     * @param array $roleData Role data that was deleted
+     * @param array<string, mixed> $roleData Role data that was deleted
      * @param string|null $deletedBy UUID of user who deleted the role
      * @return void
      */
@@ -115,7 +115,7 @@ class AuditService
      *
      * @param string $userUuid User UUID
      * @param string $roleUuid Role UUID
-     * @param array $assignmentData Assignment details (scope, expiry, etc.)
+     * @param array<string, mixed> $assignmentData Assignment details (scope, expiry, etc.)
      * @param string|null $assignedBy UUID of user who made the assignment
      * @return void
      */
@@ -169,7 +169,7 @@ class AuditService
     /**
      * Log permission created event
      *
-     * @param array $permissionData Permission data that was created
+     * @param array<string, mixed> $permissionData Permission data that was created
      * @param string|null $createdBy UUID of user who created the permission
      * @return void
      */
@@ -197,8 +197,8 @@ class AuditService
      * Log permission updated event
      *
      * @param string $permissionUuid Permission UUID
-     * @param array $oldData Previous permission data
-     * @param array $newData Updated permission data
+     * @param array<string, mixed> $oldData Previous permission data
+     * @param array<string, mixed> $newData Updated permission data
      * @param string|null $updatedBy UUID of user who updated the permission
      * @return void
      */
@@ -231,7 +231,7 @@ class AuditService
      * Log permission deleted event
      *
      * @param string $permissionUuid Permission UUID
-     * @param array $permissionData Permission data that was deleted
+     * @param array<string, mixed> $permissionData Permission data that was deleted
      * @param string|null $deletedBy UUID of user who deleted the permission
      * @return void
      */
@@ -259,7 +259,7 @@ class AuditService
      *
      * @param string $userUuid User UUID
      * @param string $permissionUuid Permission UUID
-     * @param array $assignmentData Assignment details (resource, constraints, expiry, etc.)
+     * @param array<string, mixed> $assignmentData Assignment details (resource, constraints, expiry, etc.)
      * @param string|null $grantedBy UUID of user who granted the permission
      * @return void
      */
@@ -318,7 +318,7 @@ class AuditService
      * @param string $permission Permission being checked
      * @param string $resource Resource being accessed
      * @param bool $allowed Whether permission was granted
-     * @param array $context Additional context
+     * @param array<string, mixed> $context Additional context
      * @return void
      */
     public function logPermissionCheck(
@@ -362,7 +362,7 @@ class AuditService
      * Log security event
      *
      * @param string $event Event type (e.g., 'unauthorized_access', 'suspicious_activity')
-     * @param array $data Event data
+     * @param array<string, mixed> $data Event data
      * @param string|null $userUuid User UUID if applicable
      * @return void
      */
@@ -403,6 +403,9 @@ class AuditService
 
     /**
      * Helper method to sanitize role data for logging
+     *
+     * @param array<string, mixed> $roleData
+     * @return array<string, mixed>
      */
     private function sanitizeRoleData(array $roleData): array
     {
@@ -424,6 +427,9 @@ class AuditService
 
     /**
      * Helper method to sanitize permission data for logging
+     *
+     * @param array<string, mixed> $permissionData
+     * @return array<string, mixed>
      */
     private function sanitizePermissionData(array $permissionData): array
     {
@@ -445,6 +451,10 @@ class AuditService
 
     /**
      * Calculate changes between old and new data
+     *
+     * @param array<string, mixed> $oldData
+     * @param array<string, mixed> $newData
+     * @return array<string, array{old: mixed, new: mixed}>
      */
     private function calculateChanges(array $oldData, array $newData): array
     {

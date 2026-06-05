@@ -19,12 +19,17 @@ class UserPermission
     private string $uuid;
     private string $userUuid;
     private string $permissionUuid;
+    /** @var array<string, mixed>|null */
     private ?array $resourceFilter;
+    /** @var array<string, mixed>|null */
     private ?array $constraints;
     private ?string $grantedBy;
     private ?string $expiresAt;
     private string $createdAt;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         $this->uuid = $data['uuid'] ?? '';
@@ -70,23 +75,29 @@ class UserPermission
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function getResourceFilter(): ?array
     {
         return $this->resourceFilter;
     }
 
+    /**
+     * @param array<string, mixed>|null $resourceFilter
+     */
     public function setResourceFilter(?array $resourceFilter): self
     {
         $this->resourceFilter = $resourceFilter;
         return $this;
     }
 
-    public function getResourceFilterValue(string $key, $default = null)
+    public function getResourceFilterValue(string $key, mixed $default = null): mixed
     {
         return $this->resourceFilter[$key] ?? $default;
     }
 
-    public function setResourceFilterValue(string $key, $value): self
+    public function setResourceFilterValue(string $key, mixed $value): self
     {
         if ($this->resourceFilter === null) {
             $this->resourceFilter = [];
@@ -95,23 +106,29 @@ class UserPermission
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function getConstraints(): ?array
     {
         return $this->constraints;
     }
 
+    /**
+     * @param array<string, mixed>|null $constraints
+     */
     public function setConstraints(?array $constraints): self
     {
         $this->constraints = $constraints;
         return $this;
     }
 
-    public function getConstraintValue(string $key, $default = null)
+    public function getConstraintValue(string $key, mixed $default = null): mixed
     {
         return $this->constraints[$key] ?? $default;
     }
 
-    public function setConstraintValue(string $key, $value): self
+    public function setConstraintValue(string $key, mixed $value): self
     {
         if ($this->constraints === null) {
             $this->constraints = [];
@@ -167,7 +184,7 @@ class UserPermission
         if (!$this->hasExpiry()) {
             return false;
         }
-        return strtotime($this->expiresAt) < time();
+        return strtotime((string) $this->expiresAt) < time();
     }
 
     public function isActive(): bool
@@ -175,13 +192,16 @@ class UserPermission
         return !$this->isExpired();
     }
 
+    /**
+     * @param array<string, mixed> $resourceContext
+     */
     public function matchesResource(array $resourceContext): bool
     {
         if (!$this->hasResourceFilter()) {
             return true; // No filter means it applies to all resources
         }
 
-        foreach ($this->resourceFilter as $key => $value) {
+        foreach ($this->resourceFilter ?? [] as $key => $value) {
             if (!isset($resourceContext[$key]) || $resourceContext[$key] !== $value) {
                 return false;
             }
@@ -190,6 +210,9 @@ class UserPermission
         return true;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public function satisfiesConstraints(array $context): bool
     {
         if (!$this->hasConstraints()) {
@@ -223,6 +246,9 @@ class UserPermission
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -237,6 +263,9 @@ class UserPermission
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArrayForInsert(): array
     {
         return array_filter($this->toArray(), fn($value) => $value !== null);
