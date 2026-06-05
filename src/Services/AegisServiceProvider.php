@@ -32,8 +32,9 @@ class AegisServiceProvider extends ServiceProvider
     {
         if (self::$cachedVersion === null) {
             $path = __DIR__ . '/../../composer.json';
-            $composer = json_decode(file_get_contents($path), true);
-            self::$cachedVersion = $composer['version'] ?? '0.0.0';
+            $contents = file_get_contents($path);
+            $composer = $contents !== false ? json_decode($contents, true) : null;
+            self::$cachedVersion = (is_array($composer) ? ($composer['version'] ?? null) : null) ?? '0.0.0';
         }
 
         return self::$cachedVersion;
@@ -125,6 +126,14 @@ class AegisServiceProvider extends ServiceProvider
             ]);
         } catch (\Throwable $e) {
             error_log('[Aegis] metadata registration failed: ' . $e->getMessage());
+        }
+
+        // 1.5) Discover CLI commands (e.g. aegis:bootstrap-admin) before any early-return below —
+        //      the bootstrap command is run precisely when RBAC isn't fully set up yet.
+        try {
+            $this->discoverCommands('Glueful\\Extensions\\Aegis\\Console', __DIR__ . '/../Console');
+        } catch (\Throwable $e) {
+            error_log('[Aegis] command discovery failed: ' . $e->getMessage());
         }
 
         // 2) Load routes (executes file) — guard to avoid aborting boot
