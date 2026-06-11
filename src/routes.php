@@ -11,8 +11,10 @@
  * - Permission checking and validation
  * - Statistics and maintenance operations
  *
- * All routes in this extension use proper authentication middleware
- * and require appropriate RBAC permissions.
+ * Every route requires authentication (`auth`) AND a specific RBAC permission, enforced by
+ * the `aegis_permission:<slug>` middleware (fail-closed). Reads require a view permission
+ * (`roles.view`/`users.view`); role mutations require `roles.create|edit|delete|assign`;
+ * permission-catalog and direct-permission management require `system.config`.
  */
 
 use Glueful\Routing\Router;
@@ -63,7 +65,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/', [RoleController::class, 'index']);
+        $router->get('/', [RoleController::class, 'index'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route GET /rbac/roles/stats
@@ -83,7 +85,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/stats', [RoleController::class, 'stats']);
+        $router->get('/stats', [RoleController::class, 'stats'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route POST /rbac/roles/bulk
@@ -107,7 +109,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/bulk', [RoleController::class, 'bulk']);
+        $router->post('/bulk', [RoleController::class, 'bulk'])->middleware('aegis_permission:roles.edit');
 
         /**
          * @route GET /rbac/roles/{uuid}
@@ -137,7 +139,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->get('/{uuid}', [RoleController::class, 'show']);
+        $router->get('/{uuid}', [RoleController::class, 'show'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route POST /rbac/roles
@@ -161,7 +163,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 409 application/json "Role name or slug already exists"
          */
-        $router->post('/', [RoleController::class, 'create']);
+        $router->post('/', [RoleController::class, 'create'])->middleware('aegis_permission:roles.create');
 
         /**
          * @route PUT /rbac/roles/{uuid}
@@ -179,7 +181,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->put('/{uuid}', [RoleController::class, 'update']);
+        $router->put('/{uuid}', [RoleController::class, 'update'])->middleware('aegis_permission:roles.edit');
 
         /**
          * @route DELETE /rbac/roles/{uuid}
@@ -193,7 +195,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->delete('/{uuid}', [RoleController::class, 'delete']);
+        $router->delete('/{uuid}', [RoleController::class, 'delete'])->middleware('aegis_permission:roles.delete');
 
         /**
          * @route POST /rbac/roles/{uuid}/assign
@@ -211,7 +213,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role or user not found"
          */
-        $router->post('/{uuid}/assign', [RoleController::class, 'assignToUser']);
+        $router->post('/{uuid}/assign', [RoleController::class, 'assignToUser'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route DELETE /rbac/roles/{uuid}/revoke
@@ -225,7 +227,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role or user not found"
          */
-        $router->delete('/{uuid}/revoke', [RoleController::class, 'revokeFromUser']);
+        $router->delete('/{uuid}/revoke', [RoleController::class, 'revokeFromUser'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route GET /rbac/roles/{uuid}/users
@@ -255,7 +257,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->get('/{uuid}/users', [RoleController::class, 'getUsers']);
+        $router->get('/{uuid}/users', [RoleController::class, 'getUsers'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route POST /rbac/roles/{role_uuid}/assign-users
@@ -273,7 +275,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->post('/{role_uuid}/assign-users', [UserRoleController::class, 'bulkAssignRoleToUsers']);
+        $router->post('/{role_uuid}/assign-users', [UserRoleController::class, 'bulkAssignRoleToUsers'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route DELETE /rbac/roles/{role_uuid}/revoke-users
@@ -287,7 +289,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Role not found"
          */
-        $router->delete('/{role_uuid}/revoke-users', [UserRoleController::class, 'bulkRevokeRoleFromUsers']);
+        $router->delete('/{role_uuid}/revoke-users', [UserRoleController::class, 'bulkRevokeRoleFromUsers'])->middleware('aegis_permission:roles.assign');
     });
 
     // Permission Management Routes
@@ -327,7 +329,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/', [PermissionController::class, 'index']);
+        $router->get('/', [PermissionController::class, 'index'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route GET /rbac/permissions/stats
@@ -348,7 +350,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/stats', [PermissionController::class, 'stats']);
+        $router->get('/stats', [PermissionController::class, 'stats'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route POST /rbac/permissions/cleanup-expired
@@ -359,7 +361,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 200 application/json "Expired permissions cleaned up"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/cleanup-expired', [PermissionController::class, 'cleanupExpired']);
+        $router->post('/cleanup-expired', [PermissionController::class, 'cleanupExpired'])->middleware('aegis_permission:system.config');
 
         /**
          * @route GET /rbac/permissions/categories
@@ -374,7 +376,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/categories', [PermissionController::class, 'getCategories']);
+        $router->get('/categories', [PermissionController::class, 'getCategories'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route GET /rbac/permissions/resource-types
@@ -389,7 +391,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/resource-types', [PermissionController::class, 'getResourceTypes']);
+        $router->get('/resource-types', [PermissionController::class, 'getResourceTypes'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route GET /rbac/permissions/{uuid}
@@ -416,7 +418,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->get('/{uuid}', [PermissionController::class, 'show']);
+        $router->get('/{uuid}', [PermissionController::class, 'show'])->middleware('aegis_permission:roles.view');
 
         /**
          * @route POST /rbac/permissions
@@ -436,7 +438,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 409 application/json "Permission name or slug already exists"
          */
-        $router->post('/', [PermissionController::class, 'create']);
+        $router->post('/', [PermissionController::class, 'create'])->middleware('aegis_permission:system.config');
 
         /**
          * @route PUT /rbac/permissions/{uuid}
@@ -453,7 +455,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->put('/{uuid}', [PermissionController::class, 'update']);
+        $router->put('/{uuid}', [PermissionController::class, 'update'])->middleware('aegis_permission:system.config');
 
         /**
          * @route DELETE /rbac/permissions/{uuid}
@@ -467,7 +469,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission not found"
          */
-        $router->delete('/{uuid}', [PermissionController::class, 'delete']);
+        $router->delete('/{uuid}', [PermissionController::class, 'delete'])->middleware('aegis_permission:system.config');
 
         /**
          * @route POST /rbac/permissions/{uuid}/assign
@@ -486,7 +488,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission or user not found"
          */
-        $router->post('/{uuid}/assign', [PermissionController::class, 'assignToUser']);
+        $router->post('/{uuid}/assign', [PermissionController::class, 'assignToUser'])->middleware('aegis_permission:system.config');
 
         /**
          * @route DELETE /rbac/permissions/{uuid}/revoke
@@ -500,7 +502,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "Permission or user not found"
          */
-        $router->delete('/{uuid}/revoke', [PermissionController::class, 'revokeFromUser']);
+        $router->delete('/{uuid}/revoke', [PermissionController::class, 'revokeFromUser'])->middleware('aegis_permission:system.config');
 
         /**
          * @route POST /rbac/permissions/batch-assign
@@ -516,7 +518,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/batch-assign', [PermissionController::class, 'batchAssign']);
+        $router->post('/batch-assign', [PermissionController::class, 'batchAssign'])->middleware('aegis_permission:system.config');
 
         /**
          * @route POST /rbac/permissions/batch-revoke
@@ -531,7 +533,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/batch-revoke', [PermissionController::class, 'batchRevoke']);
+        $router->post('/batch-revoke', [PermissionController::class, 'batchRevoke'])->middleware('aegis_permission:system.config');
     });
 
     // User-specific RBAC Routes
@@ -561,7 +563,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "User not found"
          */
-        $router->get('/{user_uuid}/roles', [UserRoleController::class, 'getUserRoles']);
+        $router->get('/{user_uuid}/roles', [UserRoleController::class, 'getUserRoles'])->middleware('aegis_permission:users.view');
 
         /**
          * @route POST /rbac/users/{user_uuid}/roles
@@ -578,7 +580,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/{user_uuid}/roles', [UserRoleController::class, 'assignRoles']);
+        $router->post('/{user_uuid}/roles', [UserRoleController::class, 'assignRoles'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route PUT /rbac/users/{user_uuid}/roles
@@ -595,7 +597,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->put('/{user_uuid}/roles', [UserRoleController::class, 'replaceUserRoles']);
+        $router->put('/{user_uuid}/roles', [UserRoleController::class, 'replaceUserRoles'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route DELETE /rbac/users/{user_uuid}/roles/{role_uuid}
@@ -607,7 +609,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 403 application/json "Permission denied"
          * @response 404 application/json "User or role not found"
          */
-        $router->delete('/{user_uuid}/roles/{role_uuid}', [UserRoleController::class, 'revokeRole']);
+        $router->delete('/{user_uuid}/roles/{role_uuid}', [UserRoleController::class, 'revokeRole'])->middleware('aegis_permission:roles.assign');
 
         /**
          * @route GET /rbac/users/{user_uuid}/permissions
@@ -635,7 +637,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/permissions', [PermissionController::class, 'getUserDirectPermissions']);
+        $router->get('/{user_uuid}/permissions', [PermissionController::class, 'getUserDirectPermissions'])->middleware('aegis_permission:users.view');
 
         /**
          * @route GET /rbac/users/{user_uuid}/effective-permissions
@@ -663,7 +665,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/effective-permissions', [PermissionController::class, 'getUserEffectivePermissions']);
+        $router->get('/{user_uuid}/effective-permissions', [PermissionController::class, 'getUserEffectivePermissions'])->middleware('aegis_permission:users.view');
 
         /**
          * @route GET /rbac/users/{user_uuid}/access-overview
@@ -701,7 +703,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/access-overview', [UserRoleController::class, 'getUserAccessOverview']);
+        $router->get('/{user_uuid}/access-overview', [UserRoleController::class, 'getUserAccessOverview'])->middleware('aegis_permission:users.view');
 
         /**
          * @route GET /rbac/users/{user_uuid}/role-history
@@ -736,7 +738,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * }
          * @response 403 application/json "Permission denied"
          */
-        $router->get('/{user_uuid}/role-history', [UserRoleController::class, 'getUserRoleHistory']);
+        $router->get('/{user_uuid}/role-history', [UserRoleController::class, 'getUserRoleHistory'])->middleware('aegis_permission:users.view');
 
         /**
          * @route POST /rbac/users/{user_uuid}/check-role
@@ -759,7 +761,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
          * @response 400 application/json "Invalid request format"
          * @response 403 application/json "Permission denied"
          */
-        $router->post('/{user_uuid}/check-role', [UserRoleController::class, 'checkUserRole']);
+        $router->post('/{user_uuid}/check-role', [UserRoleController::class, 'checkUserRole'])->middleware('aegis_permission:users.view');
     });
 
     // Permission/Role Checking Routes
@@ -786,7 +788,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * @response 400 application/json "Invalid request format"
      * @response 403 application/json "Permission denied"
      */
-    $router->post('/check-permission', [PermissionController::class, 'checkPermission']);
+    $router->post('/check-permission', [PermissionController::class, 'checkPermission'])->middleware('aegis_permission:users.view');
 
     // Statistics and Maintenance Routes
     /**
@@ -807,7 +809,7 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * }
      * @response 403 application/json "Permission denied"
      */
-    $router->get('/user-roles/stats', [UserRoleController::class, 'stats']);
+    $router->get('/user-roles/stats', [UserRoleController::class, 'stats'])->middleware('aegis_permission:roles.view');
 
     /**
      * @route POST /rbac/user-roles/cleanup-expired
@@ -818,5 +820,5 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
      * @response 200 application/json "Expired role assignments cleaned up"
      * @response 403 application/json "Permission denied"
      */
-    $router->post('/user-roles/cleanup-expired', [UserRoleController::class, 'cleanupExpiredRoles']);
+    $router->post('/user-roles/cleanup-expired', [UserRoleController::class, 'cleanupExpiredRoles'])->middleware('aegis_permission:roles.assign');
 });
