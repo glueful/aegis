@@ -20,6 +20,12 @@ class RolePermissionRepository extends BaseRepository
     protected string $uuidField = 'uuid';
     protected ?string $modelClass = RolePermission::class;
 
+    /** @var array<int, string> Explicit column list (avoid inheriting BaseRepository's SELECT *). */
+    protected array $defaultFields = [
+        'uuid', 'role_uuid', 'permission_uuid', 'resource_filter',
+        'constraints', 'granted_by', 'expires_at', 'created_at', 'updated_at',
+    ];
+
     /**
      * Get table name
      *
@@ -345,8 +351,10 @@ class RolePermissionRepository extends BaseRepository
             return true;
         }
 
-        // Check pattern match (e.g., "users.*" matches "users.create")
-        $pattern = str_replace('*', '.*', $filter['resource']);
+        // Check pattern match (e.g., "users.*" matches "users.create"). Quote the stored
+        // filter so regex metacharacters in it are literal, then re-enable only `*` as a
+        // wildcard -- a malformed/hostile stored filter cannot become an arbitrary regex.
+        $pattern = str_replace('\*', '.*', preg_quote((string) $filter['resource'], '/'));
         return (bool) preg_match('/^' . $pattern . '$/', $resource);
     }
 

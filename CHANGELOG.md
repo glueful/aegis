@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create/update/delete (updates record an old-vs-new field diff) -- so grants, revocations,
   and catalog changes are recorded with the real actor.
 
+### Hardening
+
+- **Provider-activation failures are now loud, not silently swallowed.** If the RBAC tables
+  are missing, `permission.manager` is unavailable, or the provider fails to activate (e.g.
+  core permissions not seeded), Aegis used to `error_log` quietly and degrade to default-deny
+  with no clear signal. It now logs explicit WARNING/ERROR messages stating that RBAC is NOT
+  active and permission checks will default-deny, and -- outside production -- a genuine
+  activation failure (tables exist but the provider could not start) is rethrown so it is
+  caught immediately.
+- **`resource_filter` wildcard matching is regex-injection-safe.** The stored filter is now
+  `preg_quote`'d before being compiled into a pattern (only `*` is re-enabled as a wildcard),
+  so a malformed or hostile stored filter cannot become an arbitrary, ReDoS-prone regex; the
+  `.` in patterns like `users.*` is now matched literally.
+- `RolePermissionRepository` declares an explicit `$defaultFields` column list instead of
+  inheriting `SELECT *`.
+
 ### Changed
 
 - **Require `glueful/framework ^1.55.0`** (was `^1.50.2`). Aegis is the permission provider

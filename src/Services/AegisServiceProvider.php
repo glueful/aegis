@@ -171,9 +171,17 @@ class AegisServiceProvider extends ServiceProvider
             error_log('[Aegis] Failed to register migrations: ' . $e->getMessage());
         }
 
-        // Permission provider wiring only if RBAC tables exist
+        // Permission provider wiring only if RBAC tables exist.
         try {
             if (!$this->tablesExist()) {
+                // Normal on a fresh install before migrations -- but say so loudly, since
+                // until the provider activates, PermissionManager has no provider and every
+                // permission check default-denies (or, worse, an app expecting RBAC silently
+                // gets none). Not fatal: install order is `require` then `migrate:run`.
+                error_log(
+                    '[Aegis] WARNING: RBAC tables not found -- the permission provider is NOT active '
+                    . 'and permission checks will default-deny. Run `php glueful migrate:run` to enable RBAC.'
+                );
                 return;
             }
 
@@ -188,17 +196,42 @@ class AegisServiceProvider extends ServiceProvider
                 'max_hierarchy_depth' => $config['roles']['max_hierarchy_depth'] ?? 10,
             ];
 
-            if ($this->app->has('permission.manager')) {
-                $manager = $this->app->get('permission.manager');
-                $manager->registerProviders(['rbac' => $provider]);
-                $manager->setProvider($provider, $providerConfig);
-            } else {
-                // Guard: log and defer when permission manager is not yet available
-                error_log('[Aegis] permission.manager not available during boot; deferring provider setup');
+            if (!$this->app->has('permission.manager')) {
+                error_log(
+                    '[Aegis] WARNING: permission.manager is unavailable during boot -- the RBAC '
+                    . 'permission provider is NOT active and permission checks will default-deny.'
+                );
+                return;
             }
-        } catch (\Exception $e) {
-            error_log('Aegis: Failed to initialize permission provider: ' . $e->getMessage());
+
+            $manager = $this->app->get('permission.manager');
+            $manager->registerProviders(['rbac' => $provider]);
+            $manager->setProvider($provider, $providerConfig);
+        } catch (\Throwable $e) {
+            // The tables exist but the provider could not be activated (e.g. core permissions
+            // not seeded). Silently degrading to default-deny would hide a real misconfiguration,
+            // so log loudly and -- outside production -- fail loud so it is caught immediately.
+            error_log(
+                '[Aegis] ERROR: the RBAC permission provider FAILED to activate; permission checks '
+                . 'will default-deny until fixed: ' . $e->getMessage()
+            );
+            if (!$this->isProduction()) {
+                throw new \RuntimeException(
+                    'Aegis RBAC permission provider failed to activate: ' . $e->getMessage()
+                    . ' (RBAC tables exist, so this is a misconfiguration -- e.g. core permissions '
+                    . 'not seeded; run `php glueful migrate:run`).',
+                    0,
+                    $e
+                );
+            }
         }
+    }
+
+    private function isProduction(): bool
+    {
+        $env = $_ENV['APP_ENV'] ?? (getenv('APP_ENV') !== false ? getenv('APP_ENV') : 'production');
+
+        return (string) $env === 'production';
     }
 
     private function tablesExist(): bool
