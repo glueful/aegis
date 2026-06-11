@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-11 — RBAC Authorization Hardening
+
+> **Security & correctness release.** Closes a privilege escalation in the RBAC management
+> API, makes privilege changes correctly attributed and audited, hardens provider activation
+> and resource-filter matching, and raises the framework baseline to 1.55.0. Ships as a minor
+> (behavioral enforcement change + raised dependency floor) -- see **Upgrade Notes**.
+
 ### Security
 
 - **Fixed privilege escalation: the `/rbac` management API now enforces RBAC permissions.**
@@ -42,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.` in patterns like `users.*` is now matched literally.
 - `RolePermissionRepository` declares an explicit `$defaultFields` column list instead of
   inheriting `SELECT *`.
+- Fixed `getVersion()` always reporting `0.0.0`: it read a top-level `version` key that does
+  not exist; it now reads `extra.glueful.version` (the manifest the loader uses).
 
 ### Changed
 
@@ -49,6 +58,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that backs `PermissionManager::can()`, and 1.55.0 is the release where route permission
   enforcement (`#[RequiresPermission]`, the gate middleware) and the container load-time
   guards become real -- so the provider now requires that security baseline.
+
+### Upgrade Notes
+
+- **The `/rbac` management API now enforces RBAC permissions.** Previously any authenticated
+  user could call any `/rbac` endpoint; now a caller without the required permission receives
+  **403**. Ensure the users who manage RBAC hold the appropriate permissions -- the seeded
+  `superuser` / `administrator` roles already do (role/permission *catalog* edits and direct
+  raw-permission grants require `superuser`). Clients that relied on the previously-open API
+  will need the right role assigned.
+- **Requires `glueful/framework ^1.55.0`.** Update the framework first; `composer update` will
+  not resolve aegis 1.7.0 against an older framework. No new env vars, no new migrations.
 
 ### Planned
 - GraphQL API support for role and permission management

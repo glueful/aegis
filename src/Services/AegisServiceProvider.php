@@ -34,7 +34,12 @@ class AegisServiceProvider extends ServiceProvider
             $path = __DIR__ . '/../../composer.json';
             $contents = file_get_contents($path);
             $composer = $contents !== false ? json_decode($contents, true) : null;
-            self::$cachedVersion = (is_array($composer) ? ($composer['version'] ?? null) : null) ?? '0.0.0';
+            // The version lives under extra.glueful.version (the manifest the loader reads);
+            // fall back to a top-level `version` for safety.
+            $version = is_array($composer)
+                ? ($composer['extra']['glueful']['version'] ?? $composer['version'] ?? null)
+                : null;
+            self::$cachedVersion = is_string($version) ? $version : '0.0.0';
         }
 
         return self::$cachedVersion;
