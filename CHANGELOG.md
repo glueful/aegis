@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Fixed privilege escalation: the `/rbac` management API now enforces RBAC permissions.**
+  Every `/rbac` route previously ran with only the `auth` middleware and no permission
+  check, so **any authenticated user** could call e.g. `POST /rbac/users/{uuid}/roles` to
+  grant themselves an admin role (or create roles / assign raw permissions). All 37 routes
+  are now gated by a new fail-closed `aegis_permission:<slug>` middleware: reads require a
+  view permission (`roles.view` / `users.view`), role mutations require
+  `roles.create|edit|delete|assign`, and permission-catalog / direct-permission management
+  require `system.config` (superuser). A missing user, unresolvable `PermissionManager`, or
+  denied check returns 403.
+
 ### Planned
 - GraphQL API support for role and permission management
 - Advanced permission templating system

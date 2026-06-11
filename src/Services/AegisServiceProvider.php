@@ -67,6 +67,15 @@ class AegisServiceProvider extends ServiceProvider
             ],
             AuditService::class => ['class' => AuditService::class, 'shared' => true, 'autowire' => true],
 
+            // RBAC permission gate for the (fluent) management routes. Aliased 'aegis_permission'
+            // so routes can require a specific permission via ->middleware('aegis_permission:<slug>').
+            \Glueful\Extensions\Aegis\Http\RequirePermission::class => [
+                'class' => \Glueful\Extensions\Aegis\Http\RequirePermission::class,
+                'shared' => true,
+                'autowire' => true,
+                'alias' => ['aegis_permission'],
+            ],
+
             AegisPermissionProvider::class => ['class' => AegisPermissionProvider::class, 'shared' => true, 'autowire' => true],
 
             // Folds Aegis role claims into the authenticated identity post-auth. Tagged
