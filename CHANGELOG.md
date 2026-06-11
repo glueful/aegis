@@ -23,8 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   someone else made the change); it is now always sourced from the authenticated identity
   (`auth.user`) via a `ResolvesActor` trait, and client-supplied values are ignored.
   The built-but-unused `AuditService` is now wired into every privilege change -- role and
-  permission assign/revoke (incl. bulk and role-replace) and role/permission create/delete
-  -- so grants, revocations, and catalog changes are recorded with the real actor.
+  permission assign/revoke (incl. bulk and role-replace) and role/permission
+  create/update/delete (updates record an old-vs-new field diff) -- so grants, revocations,
+  and catalog changes are recorded with the real actor.
+
+### Changed
+
+- **Require `glueful/framework ^1.55.0`** (was `^1.50.2`). Aegis is the permission provider
+  that backs `PermissionManager::can()`, and 1.55.0 is the release where route permission
+  enforcement (`#[RequiresPermission]`, the gate middleware) and the container load-time
+  guards become real -- so the provider now requires that security baseline.
 
 ### Planned
 - GraphQL API support for role and permission management

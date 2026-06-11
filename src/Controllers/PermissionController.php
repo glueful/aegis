@@ -151,12 +151,20 @@ class PermissionController
             $uuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
+            $oldPermission = $this->permissionRepository->findRecordByUuid($uuid);
+
             $updated = $this->permissionService->updatePermission($uuid, $data);
             if (!$updated) {
                 return Response::serverError('Failed to update permission');
             }
 
             $permission = $this->permissionRepository->findRecordByUuid($uuid);
+            $this->audit->logPermissionUpdated(
+                $uuid,
+                is_array($oldPermission) ? $oldPermission : [],
+                is_array($permission) ? $permission : [],
+                $this->actorUuid($request)
+            );
             return Response::success($permission, 'Permission updated successfully');
         } catch (\InvalidArgumentException $e) {
             return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');

@@ -155,12 +155,20 @@ class RoleController
             $uuid = $request->attributes->get('uuid', '');
             $data = $request->toArray();
 
+            $oldRole = $this->roleRepository->findRecordByUuid($uuid);
+
             $updated = $this->roleService->updateRole($uuid, $data);
             if (!$updated) {
                 return Response::serverError('Failed to update role');
             }
 
             $role = $this->roleRepository->findRecordByUuid($uuid);
+            $this->audit->logRoleUpdated(
+                $uuid,
+                is_array($oldRole) ? $oldRole : [],
+                is_array($role) ? $role : [],
+                $this->actorUuid($request)
+            );
             return Response::success($role, 'Role updated successfully');
         } catch (\InvalidArgumentException $e) {
             return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');
