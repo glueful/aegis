@@ -96,6 +96,7 @@ class AegisServiceProvider extends ServiceProvider
                     '@' . PermissionAssignmentService::class,
                     '@' . PermissionRepository::class,
                     '@' . UserPermissionRepository::class,
+                    '@' . AuditService::class,
                 ],
             ],
             RoleController::class => [
@@ -104,6 +105,7 @@ class AegisServiceProvider extends ServiceProvider
                 'arguments' => [
                     '@' . RoleService::class,
                     '@' . RoleRepository::class,
+                    '@' . AuditService::class,
                 ],
             ],
             UserRoleController::class => [
@@ -113,6 +115,7 @@ class AegisServiceProvider extends ServiceProvider
                     '@' . RoleService::class,
                     '@' . PermissionAssignmentService::class,
                     '@' . UserRoleRepository::class,
+                    '@' . AuditService::class,
                 ],
             ],
         ];

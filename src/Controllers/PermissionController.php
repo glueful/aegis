@@ -6,8 +6,10 @@ namespace Glueful\Extensions\Aegis\Controllers;
 
 use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
+use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Http\Exceptions\Client\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -22,18 +24,23 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class PermissionController
 {
+    use ResolvesActor;
+
     private PermissionAssignmentService $permissionService;
     private PermissionRepository $permissionRepository;
     private UserPermissionRepository $userPermissionRepository;
+    private AuditService $audit;
 
     public function __construct(
         PermissionAssignmentService $permissionService,
         PermissionRepository $permissionRepository,
-        UserPermissionRepository $userPermissionRepository
+        UserPermissionRepository $userPermissionRepository,
+        AuditService $audit
     ) {
         $this->permissionService = $permissionService;
         $this->permissionRepository = $permissionRepository;
         $this->userPermissionRepository = $userPermissionRepository;
+        $this->audit = $audit;
     }
 
     /**
@@ -123,6 +130,8 @@ class PermissionController
                 return Response::serverError('Failed to create permission');
             }
 
+            $this->audit->logPermissionCreated($permission->toArray(), $this->actorUuid($request));
+
             return Response::created($permission->toArray(), 'Permission created successfully');
         } catch (\InvalidArgumentException $e) {
             return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');
@@ -167,10 +176,14 @@ class PermissionController
             $uuid = $request->attributes->get('uuid', '');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
+            $permission = $this->permissionRepository->findRecordByUuid($uuid);
+
             $deleted = $this->permissionService->deletePermission($uuid, $force);
             if (!$deleted) {
                 return Response::serverError('Failed to delete permission');
             }
+
+            $this->audit->logPermissionDeleted($uuid, is_array($permission) ? $permission : [], $this->actorUuid($request));
 
             return Response::success(null, 'Permission deleted successfully');
         } catch (\InvalidArgumentException $e) {
@@ -203,9 +216,10 @@ class PermissionController
                 throw new NotFoundException('Permission not found');
             }
 
+            $actor = $this->actorUuid($request);
             $resource = $data['resource'] ?? '*';
             $options = [
-                'granted_by' => $data['granted_by'] ?? null,
+                'granted_by' => $actor,
                 'expires_at' => $data['expires_at'] ?? null,
                 'constraints' => $data['constraints'] ?? null
             ];
@@ -220,6 +234,13 @@ class PermissionController
             if (!$assigned) {
                 return Response::serverError('Failed to assign permission');
             }
+
+            $this->audit->logPermissionAssigned(
+                $data['user_uuid'],
+                $permissionUuid,
+                array_merge($options, ['resource' => $resource]),
+                $actor
+            );
 
             return Response::success(null, 'Permission assigned successfully');
         } catch (NotFoundException $e) {
@@ -258,6 +279,10 @@ class PermissionController
                 $data['user_uuid'],
                 $permission['slug']
             );
+
+            if ($revoked) {
+                $this->audit->logPermissionRevoked($data['user_uuid'], $permissionUuid, $this->actorUuid($request));
+            }
 
             return Response::success(['revoked' => $revoked], 'Permission revocation processed');
         } catch (NotFoundException $e) {

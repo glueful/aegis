@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `roles.create|edit|delete|assign`, and permission-catalog / direct-permission management
   require `system.config` (superuser). A missing user, unresolvable `PermissionManager`, or
   denied check returns 403.
+- **Privilege changes are now correctly attributed and audited.** The `assigned_by` /
+  `granted_by` actor was read from the request body (spoofable -- a caller could claim
+  someone else made the change); it is now always sourced from the authenticated identity
+  (`auth.user`) via a `ResolvesActor` trait, and client-supplied values are ignored.
+  The built-but-unused `AuditService` is now wired into every privilege change -- role and
+  permission assign/revoke (incl. bulk and role-replace) and role/permission create/delete
+  -- so grants, revocations, and catalog changes are recorded with the real actor.
 
 ### Planned
 - GraphQL API support for role and permission management

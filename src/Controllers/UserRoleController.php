@@ -7,7 +7,9 @@ namespace Glueful\Extensions\Aegis\Controllers;
 use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
+use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -21,18 +23,23 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class UserRoleController
 {
+    use ResolvesActor;
+
     private RoleService $roleService;
     private PermissionAssignmentService $permissionService;
     private UserRoleRepository $userRoleRepository;
+    private AuditService $audit;
 
     public function __construct(
         RoleService $roleService,
         PermissionAssignmentService $permissionService,
-        UserRoleRepository $userRoleRepository
+        UserRoleRepository $userRoleRepository,
+        AuditService $audit
     ) {
         $this->roleService = $roleService;
         $this->permissionService = $permissionService;
         $this->userRoleRepository = $userRoleRepository;
+        $this->audit = $audit;
     }
 
     /**
@@ -83,10 +90,11 @@ class UserRoleController
                 'errors' => []
             ];
 
+            $actor = $this->actorUuid($request);
             $options = [
                 'scope' => $data['scope'] ?? [],
                 'expires_at' => $data['expires_at'] ?? null,
-                'assigned_by' => $data['assigned_by'] ?? null
+                'assigned_by' => $actor,
             ];
 
             foreach ($data['role_uuids'] as $roleUuid) {
@@ -94,6 +102,7 @@ class UserRoleController
                     $assigned = $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
                     if ($assigned) {
                         $results['success']++;
+                        $this->audit->logRoleAssigned($userUuid, $roleUuid, $options, $actor);
                     } else {
                         $results['failed']++;
                         $results['errors'][] = "Failed to assign role {$roleUuid}";
@@ -129,6 +138,8 @@ class UserRoleController
                 return Response::serverError('Failed to revoke role');
             }
 
+            $this->audit->logRoleRevoked($userUuid, $roleUuid, $this->actorUuid($request));
+
             return Response::success(null, 'Role revoked successfully');
         } catch (\Exception $e) {
             return Response::serverError($e->getMessage());
@@ -163,10 +174,11 @@ class UserRoleController
                 'errors' => []
             ];
 
+            $actor = $this->actorUuid($request);
             $options = [
                 'scope' => $scope,
                 'expires_at' => $data['expires_at'] ?? null,
-                'assigned_by' => $data['assigned_by'] ?? null
+                'assigned_by' => $actor,
             ];
 
             // Remove roles that are no longer assigned
@@ -175,6 +187,7 @@ class UserRoleController
                     try {
                         $this->roleService->revokeRoleFromUser($userUuid, $currentRoleUuid);
                         $results['removed']++;
+                        $this->audit->logRoleRevoked($userUuid, $currentRoleUuid, $actor);
                     } catch (\Exception $e) {
                         $results['errors'][] = "Failed to remove role {$currentRoleUuid}: " . $e->getMessage();
                     }
@@ -187,6 +200,7 @@ class UserRoleController
                     try {
                         $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
                         $results['added']++;
+                        $this->audit->logRoleAssigned($userUuid, $roleUuid, $options, $actor);
                     } catch (\Exception $e) {
                         $results['errors'][] = "Failed to add role {$roleUuid}: " . $e->getMessage();
                     }
@@ -319,10 +333,11 @@ class UserRoleController
                 'errors' => []
             ];
 
+            $actor = $this->actorUuid($request);
             $options = [
                 'scope' => $data['scope'] ?? [],
                 'expires_at' => $data['expires_at'] ?? null,
-                'assigned_by' => $data['assigned_by'] ?? null
+                'assigned_by' => $actor,
             ];
 
             foreach ($data['user_uuids'] as $userUuid) {
@@ -330,6 +345,7 @@ class UserRoleController
                     $assigned = $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
                     if ($assigned) {
                         $results['success']++;
+                        $this->audit->logRoleAssigned($userUuid, $roleUuid, $options, $actor);
                     } else {
                         $results['failed']++;
                         $results['errors'][] = "Failed to assign role to user {$userUuid}";
@@ -373,11 +389,13 @@ class UserRoleController
                 'errors' => []
             ];
 
+            $actor = $this->actorUuid($request);
             foreach ($data['user_uuids'] as $userUuid) {
                 try {
                     $revoked = $this->roleService->revokeRoleFromUser($userUuid, $roleUuid);
                     if ($revoked) {
                         $results['success']++;
+                        $this->audit->logRoleRevoked($userUuid, $roleUuid, $actor);
                     } else {
                         $results['failed']++;
                         $results['errors'][] = "Failed to revoke role from user {$userUuid}";

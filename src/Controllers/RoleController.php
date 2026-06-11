@@ -6,7 +6,9 @@ namespace Glueful\Extensions\Aegis\Controllers;
 
 use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\RoleService;
+use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Http\Exceptions\Client\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -21,13 +23,20 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class RoleController
 {
+    use ResolvesActor;
+
     private RoleService $roleService;
     private RoleRepository $roleRepository;
+    private AuditService $audit;
 
-    public function __construct(RoleService $roleService, RoleRepository $roleRepository)
-    {
+    public function __construct(
+        RoleService $roleService,
+        RoleRepository $roleRepository,
+        AuditService $audit
+    ) {
         $this->roleService = $roleService;
         $this->roleRepository = $roleRepository;
+        $this->audit = $audit;
     }
 
     /**
@@ -125,6 +134,8 @@ class RoleController
                 return Response::serverError('Failed to create role');
             }
 
+            $this->audit->logRoleCreated($role->toArray(), $this->actorUuid($request));
+
             return Response::created($role->toArray(), 'Role created successfully');
         } catch (\InvalidArgumentException $e) {
             return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');
@@ -169,10 +180,14 @@ class RoleController
             $uuid = $request->attributes->get('uuid', '');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
+            $role = $this->roleRepository->findRecordByUuid($uuid);
+
             $deleted = $this->roleService->deleteRole($uuid, $force);
             if (!$deleted) {
                 return Response::serverError('Failed to delete role');
             }
+
+            $this->audit->logRoleDeleted($uuid, is_array($role) ? $role : [], $this->actorUuid($request));
 
             return Response::success(null, 'Role deleted successfully');
         } catch (\InvalidArgumentException $e) {
@@ -197,16 +212,19 @@ class RoleController
                 return Response::validation(['user_uuid' => ['User UUID is required']], 'Validation failed');
             }
 
+            $actor = $this->actorUuid($request);
             $options = [
                 'scope' => $data['scope'] ?? [],
                 'expires_at' => $data['expires_at'] ?? null,
-                'assigned_by' => $data['assigned_by'] ?? null
+                'assigned_by' => $actor,
             ];
 
             $assigned = $this->roleService->assignRoleToUser($data['user_uuid'], $roleUuid, $options);
             if (!$assigned) {
                 return Response::serverError('Failed to assign role');
             }
+
+            $this->audit->logRoleAssigned($data['user_uuid'], $roleUuid, $options, $actor);
 
             return Response::success(null, 'Role assigned successfully');
         } catch (\InvalidArgumentException $e) {
@@ -235,6 +253,8 @@ class RoleController
             if (!$revoked) {
                 return Response::serverError('Failed to revoke role');
             }
+
+            $this->audit->logRoleRevoked($data['user_uuid'], $roleUuid, $this->actorUuid($request));
 
             return Response::success(null, 'Role revoked successfully');
         } catch (\Exception $e) {
