@@ -34,6 +34,11 @@ class RoleRepository extends BaseRepository
     /** @var array<string, Role|null> */
     private static array $globalRolesCache = [];
 
+    public static function clearCache(): void
+    {
+        self::$globalRolesCache = [];
+    }
+
     public function getTableName(): string
     {
         return $this->table;
@@ -50,6 +55,9 @@ class RoleRepository extends BaseRepository
         if (!$success) {
             throw new \RuntimeException('Failed to create role');
         }
+
+        $this->rolesCache = [];
+        self::clearCache();
 
         return $data['uuid'];
     }
@@ -148,12 +156,24 @@ class RoleRepository extends BaseRepository
             $data['updated_at'] = $this->db->getDriver()->formatDateTime();
         }
 
-        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
+        $updated = (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->update($data);
+        if ($updated) {
+            unset($this->rolesCache[$uuid]);
+            unset(self::$globalRolesCache[$uuid]);
+        }
+
+        return $updated;
     }
 
     public function delete(string $uuid): bool
     {
-        return (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
+        $deleted = (bool) $this->db->table($this->table)->where(['uuid' => $uuid])->delete();
+        if ($deleted) {
+            unset($this->rolesCache[$uuid]);
+            unset(self::$globalRolesCache[$uuid]);
+        }
+
+        return $deleted;
     }
 
     public function softDeleteRole(string $uuid): bool

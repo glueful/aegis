@@ -140,6 +140,14 @@ class RoleService
                         throw new \InvalidArgumentException('Circular role hierarchy detected');
                     }
 
+                    if ($updatedBy !== null && $updatedBy !== '') {
+                        $this->assertActorCanManageRole(
+                            $updatedBy,
+                            $parentRole,
+                            'Cannot set a role parent the actor does not hold or outrank'
+                        );
+                    }
+
                     $data['level'] = $parentRole->getLevel() + 1;
                 } else {
                     $data['level'] = 0;
@@ -234,6 +242,15 @@ class RoleService
 
         if (!$role->isActive()) {
             throw new \InvalidArgumentException('Cannot assign inactive role');
+        }
+
+        $actorUuid = $this->assignmentActor($options);
+        if ($actorUuid !== null) {
+            $this->assertActorCanManageRole(
+                $actorUuid,
+                $role,
+                'Cannot assign a role the actor does not hold or outrank'
+            );
         }
 
         // Check if already assigned
@@ -394,6 +411,46 @@ class RoleService
             // Recursively update grandchildren
             $this->updateChildRoleLevels($child->getUuid());
         }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function assignmentActor(array $options): ?string
+    {
+        $actor = $options['assigned_by'] ?? $options['granted_by'] ?? null;
+
+        return is_string($actor) && $actor !== '' ? $actor : null;
+    }
+
+    private function assertActorCanManageRole(string $actorUuid, Role $targetRole, string $message): void
+    {
+        if ($this->actorCanManageRole($actorUuid, $targetRole)) {
+            return;
+        }
+
+        throw new \InvalidArgumentException($message);
+    }
+
+    private function actorCanManageRole(string $actorUuid, Role $targetRole): bool
+    {
+        $actorRoleUuids = $this->userRoleRepository->getUserRoleUuids($actorUuid);
+        if ($actorRoleUuids === []) {
+            return false;
+        }
+
+        $manageableRoleUuids = array_map(
+            static fn(Role $role): string => $role->getUuid(),
+            $this->roleRepository->getRoleHierarchy($targetRole->getUuid())
+        );
+
+        foreach ($actorRoleUuids as $actorRoleUuid) {
+            if (in_array($actorRoleUuid, $manageableRoleUuids, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

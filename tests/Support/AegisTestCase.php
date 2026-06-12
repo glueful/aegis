@@ -8,6 +8,7 @@ use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Database\Connection;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
+use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Helpers\Utils;
 use PHPUnit\Framework\TestCase;
 
@@ -36,6 +37,7 @@ abstract class AegisTestCase extends TestCase
         new PermissionRepository($this->connection);
         // Static lookup caches persist across cases (distinct DBs) — clear for isolation.
         PermissionRepository::clearCache();
+        RoleRepository::clearCache();
         \Glueful\Extensions\Aegis\Repositories\UserRoleRepository::flushGlobalCache();
         \Glueful\Extensions\Aegis\Repositories\UserPermissionRepository::flushGlobalCache();
     }

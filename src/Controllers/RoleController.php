@@ -157,7 +157,8 @@ class RoleController
 
             $oldRole = $this->roleRepository->findRecordByUuid($uuid);
 
-            $updated = $this->roleService->updateRole($uuid, $data);
+            $actor = $this->actorUuid($request);
+            $updated = $this->roleService->updateRole($uuid, $data, $actor);
             if (!$updated) {
                 return Response::serverError('Failed to update role');
             }
@@ -167,7 +168,7 @@ class RoleController
                 $uuid,
                 is_array($oldRole) ? $oldRole : [],
                 is_array($role) ? $role : [],
-                $this->actorUuid($request)
+                $actor
             );
             return Response::success($role, 'Role updated successfully');
         } catch (\InvalidArgumentException $e) {
