@@ -166,7 +166,7 @@ class UserRoleRepository extends BaseRepository
     public function hasUserRole(string $userUuid, string $roleUuid, array $scope = []): bool
     {
         $query = $this->db->table($this->table)
-            ->select(['uuid'])
+            ->select($this->defaultFields)
             ->where([
                 'user_uuid' => $userUuid,
                 'role_uuid' => $roleUuid
@@ -282,9 +282,11 @@ class UserRoleRepository extends BaseRepository
      */
     public function assignRole(string $userUuid, string $roleUuid, array $options = []): ?UserRole
     {
+        $scope = $options['scope'] ?? [];
+
         // Check if assignment already exists
-        if ($this->hasUserRole($userUuid, $roleUuid, $options['scope'] ?? [])) {
-            return $this->findUserRole($userUuid, $roleUuid);
+        if ($this->hasUserRole($userUuid, $roleUuid, $scope)) {
+            return $this->findMatchingUserRole($userUuid, $roleUuid, $scope);
         }
 
         $data = [
@@ -299,6 +301,20 @@ class UserRoleRepository extends BaseRepository
         }
 
         return $this->createUserRole($data);
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function findMatchingUserRole(string $userUuid, string $roleUuid, array $scope = []): ?UserRole
+    {
+        foreach ($this->findByUser($userUuid, ['role_uuid' => $roleUuid, 'active_only' => true]) as $userRole) {
+            if ($userRole->matchesScope($scope)) {
+                return $userRole;
+            }
+        }
+
+        return null;
     }
 
     public function revokeRole(string $userUuid, string $roleUuid): bool

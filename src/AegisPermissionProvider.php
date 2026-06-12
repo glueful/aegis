@@ -787,7 +787,7 @@ public function initialize(array $config = []): void
         string $resource,
         array $context = []
     ): bool {
-        $userRoles = $this->getUserRoles($userUuid);
+        $userRoles = $this->getUserRoles($userUuid, $this->scopeFromContext($context));
 
         foreach ($userRoles as $role) {
             if ($this->roleHasPermission($role, $permission, $resource)) {
@@ -806,6 +806,17 @@ public function initialize(array $config = []): void
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function scopeFromContext(array $context): array
+    {
+        $scope = $context['scope'] ?? [];
+
+        return is_array($scope) ? $scope : [];
     }
 
     private function roleHasPermission(Role $role, string $permission, string $resource): bool
