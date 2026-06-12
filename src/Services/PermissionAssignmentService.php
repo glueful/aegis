@@ -2,6 +2,7 @@
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
@@ -44,13 +45,36 @@ class PermissionAssignmentService
         UserPermissionRepository $userPermissionRepository,
         RoleRepository $roleRepository,
         UserRoleRepository $userRoleRepository,
-        RolePermissionRepository $rolePermissionRepository
+        RolePermissionRepository $rolePermissionRepository,
+        private readonly ?AegisPermissionProvider $permissionProvider = null
     ) {
         $this->permissionRepository = $permissionRepository;
         $this->userPermissionRepository = $userPermissionRepository;
         $this->roleRepository = $roleRepository;
         $this->userRoleRepository = $userRoleRepository;
         $this->rolePermissionRepository = $rolePermissionRepository;
+    }
+
+    /**
+     * Drop cached state for one user after a privilege mutation — both this
+     * service's request-local cache and the provider's distributed decision
+     * caches. Without the provider call, a revoked permission stays effective
+     * (and a fresh grant stays masked by a cached negative) until the TTL.
+     */
+    private function invalidateUserPermissionState(string $userUuid): void
+    {
+        foreach (array_keys($this->cache['user_permissions']) as $key) {
+            if (str_starts_with((string) $key, $userUuid . '_')) {
+                unset($this->cache['user_permissions'][$key]);
+            }
+        }
+        foreach (array_keys($this->cache['user_roles']) as $key) {
+            if (str_starts_with((string) $key, $userUuid . '_')) {
+                unset($this->cache['user_roles'][$key]);
+            }
+        }
+
+        $this->permissionProvider?->invalidateUserCache($userUuid);
     }
 
     /**
@@ -94,7 +118,11 @@ class PermissionAssignmentService
 
         try {
             $result = $this->userPermissionRepository->create($data);
-            return !empty($result);
+            if (!empty($result)) {
+                $this->invalidateUserPermissionState($userUuid);
+                return true;
+            }
+            return false;
         } catch (\Exception) {
             return false;
         }
@@ -110,7 +138,13 @@ class PermissionAssignmentService
             return false; // Permission doesn't exist, consider it revoked
         }
 
-        return $this->userPermissionRepository->revokeUserPermission($userUuid, $permission->getUuid());
+        $revoked = $this->userPermissionRepository->revokeUserPermission($userUuid, $permission->getUuid());
+
+        if ($revoked) {
+            $this->invalidateUserPermissionState($userUuid);
+        }
+
+        return $revoked;
     }
 
     /**
@@ -408,7 +442,16 @@ class PermissionAssignmentService
             $data['metadata'] = json_encode($data['metadata']);
         }
 
-        return $this->permissionRepository->update($uuid, $data);
+        $updated = $this->permissionRepository->update($uuid, $data);
+
+        // Slug/metadata changes affect every cached decision that named this
+        // permission — there is no per-permission cache index, so clear broadly.
+        if ($updated) {
+            $this->cache = ['user_roles' => [], 'user_permissions' => [], 'role_permissions' => []];
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $updated;
     }
 
     /**
@@ -439,7 +482,14 @@ class PermissionAssignmentService
             }
         }
 
-        return $this->permissionRepository->delete($uuid);
+        $deleted = $this->permissionRepository->delete($uuid);
+
+        if ($deleted) {
+            $this->cache = ['user_roles' => [], 'user_permissions' => [], 'role_permissions' => []];
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $deleted;
     }
 
     /**

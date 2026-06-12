@@ -323,7 +323,11 @@ public function initialize(array $config = []): void
     /** @param string[] $slugs */
     public function pruneCatalog(array $slugs): int
     {
-        return $this->getPermissionRepository()->deleteManagedBySlugs($slugs);
+        $deleted = $this->getPermissionRepository()->deleteManagedBySlugs($slugs);
+        if ($deleted > 0) {
+            $this->invalidateAllCache();
+        }
+        return $deleted;
     }
 
     /** @return array<string, string> */
@@ -335,7 +339,11 @@ public function initialize(array $config = []): void
     /** @param string[] $roleSlugs */
     public function pruneRoles(array $roleSlugs): int
     {
-        return $this->getRoleRepository()->deleteManagedBySlugs($roleSlugs);
+        $deleted = $this->getRoleRepository()->deleteManagedBySlugs($roleSlugs);
+        if ($deleted > 0) {
+            $this->invalidateAllCache();
+        }
+        return $deleted;
     }
 
     /**
@@ -396,6 +404,13 @@ public function initialize(array $config = []): void
             if (!isset($declaredSlugs[$slug])) {
                 $stale[] = $slug;
             }
+        }
+
+        // Catalog sync rewrites permissions and role grants — cached decisions,
+        // user permission sets, and role_permission:* check results are all
+        // potentially stale now.
+        if ($created > 0 || $updated > 0 || $roles !== []) {
+            $this->invalidateAllCache();
         }
 
         return new SyncResult($created, $updated, $unchanged, $stale);
@@ -541,6 +556,11 @@ public function initialize(array $config = []): void
             unset($this->userRolesCache[$key]);
         }
 
+        // Clear the repository-level static caches — they are shared across all
+        // repository instances, so a stale entry there would survive everything above.
+        UserRoleRepository::forgetUserGlobalCache($userUuid);
+        UserPermissionRepository::forgetUserGlobalCache($userUuid);
+
         // Clear distributed cache if enabled
         if ($this->cacheEnabled && $this->cache !== null) {
             try {
@@ -560,8 +580,11 @@ public function initialize(array $config = []): void
 
     public function invalidateAllCache(): void
     {
-        // Clear memory cache
+        // Clear memory caches
         $this->permissionCache = [];
+        $this->userRolesCache = [];
+        UserRoleRepository::flushGlobalCache();
+        UserPermissionRepository::flushGlobalCache();
 
         // Clear distributed cache if enabled
         if ($this->cacheEnabled && $this->cache !== null) {

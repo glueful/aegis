@@ -2,6 +2,7 @@
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
 use Glueful\Extensions\Aegis\Models\Role;
@@ -32,8 +33,11 @@ class RoleService
      */
     private array $userRolesCache = [];
 
-    public function __construct(RoleRepository $roleRepository, UserRoleRepository $userRoleRepository)
-    {
+    public function __construct(
+        RoleRepository $roleRepository,
+        UserRoleRepository $userRoleRepository,
+        private readonly ?AegisPermissionProvider $permissionProvider = null
+    ) {
         $this->roleRepository = $roleRepository;
         $this->userRoleRepository = $userRoleRepository;
     }
@@ -151,7 +155,16 @@ class RoleService
             $data['metadata'] = json_encode($data['metadata']);
         }
 
-        return $this->roleRepository->update($uuid, $data);
+        $updated = $this->roleRepository->update($uuid, $data);
+
+        // Hierarchy/status/slug changes affect every member of this role (and
+        // its descendants) — cached decisions must not outlive the change.
+        if ($updated) {
+            $this->clearUserRolesCache();
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $updated;
     }
 
     /**
@@ -197,7 +210,14 @@ class RoleService
             }
         }
 
-        return $this->roleRepository->delete($uuid);
+        $deleted = $this->roleRepository->delete($uuid);
+
+        if ($deleted) {
+            $this->clearUserRolesCache();
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $deleted;
     }
 
     /**
@@ -224,9 +244,11 @@ class RoleService
 
         $assignment = $this->userRoleRepository->assignRole($userUuid, $roleUuid, $options);
 
-        // Invalidate cache for this user
+        // Invalidate every cache layer for this user — including the provider's
+        // distributed decision caches, or a cached negative masks the new grant.
         if ($assignment !== null) {
             $this->invalidateUserRolesCache($userUuid);
+            $this->permissionProvider?->invalidateUserCache($userUuid);
         }
 
         return $assignment !== null;
@@ -239,9 +261,12 @@ class RoleService
     {
         $result = $this->userRoleRepository->revokeRole($userUuid, $roleUuid);
 
-        // Invalidate cache for this user
+        // Invalidate every cache layer for this user — including the provider's
+        // distributed decision caches, or the revoked role stays effective
+        // until the cache TTL expires (up to an hour).
         if ($result) {
             $this->invalidateUserRolesCache($userUuid);
+            $this->permissionProvider?->invalidateUserCache($userUuid);
         }
 
         return $result;

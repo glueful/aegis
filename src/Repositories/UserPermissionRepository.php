@@ -26,9 +26,30 @@ class UserPermissionRepository extends BaseRepository
     ];
     protected bool $hasUpdatedAt = false;
 
-    // Cache to prevent duplicate queries within a single request
+    // Static cache to prevent duplicate queries across all instances within a single
+    // request. Deliberately the ONLY in-process cache layer: every repository instance
+    // (provider, services, controllers) shares it, so invalidation reaches them all.
     /** @var array<string, list<UserPermission>> */
-    private array $userPermissionsCache = [];
+    private static array $userPermissionsCache = [];
+
+    /**
+     * Drop every cached permission list for one user (all filter variants).
+     * Must be called whenever the user's direct grants change, or stale
+     * grants stay effective for the rest of the process.
+     */
+    public static function forgetUserGlobalCache(string $userUuid): void
+    {
+        foreach (array_keys(self::$userPermissionsCache) as $cacheKey) {
+            if (str_starts_with($cacheKey, $userUuid . '_')) {
+                unset(self::$userPermissionsCache[$cacheKey]);
+            }
+        }
+    }
+
+    public static function flushGlobalCache(): void
+    {
+        self::$userPermissionsCache = [];
+    }
 
     public function getTableName(): string
     {
@@ -92,8 +113,8 @@ class UserPermissionRepository extends BaseRepository
         // Create cache key based on user UUID and filters
         $cacheKey = $userUuid . '_' . md5(serialize($filters));
 
-        if (isset($this->userPermissionsCache[$cacheKey])) {
-            return $this->userPermissionsCache[$cacheKey];
+        if (isset(self::$userPermissionsCache[$cacheKey])) {
+            return self::$userPermissionsCache[$cacheKey];
         }
 
         $query = $this->db->table($this->table)
@@ -118,7 +139,7 @@ class UserPermissionRepository extends BaseRepository
         $userPermissions = array_map(fn($row) => new UserPermission($row), $results);
 
         // Cache the result
-        $this->userPermissionsCache[$cacheKey] = $userPermissions;
+        self::$userPermissionsCache[$cacheKey] = $userPermissions;
 
         return $userPermissions;
     }

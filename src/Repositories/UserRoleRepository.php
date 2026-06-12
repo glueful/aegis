@@ -26,13 +26,30 @@ class UserRoleRepository extends BaseRepository
     ];
     protected bool $hasUpdatedAt = false;
 
-    // Cache to prevent duplicate queries within a single request
-    /** @var array<string, list<UserRole>> */
-    private array $userRolesCache = [];
-
-    // Static cache to prevent duplicate queries across all instances within a single request
+    // Static cache to prevent duplicate queries across all instances within a single request.
+    // Deliberately the ONLY in-process cache layer: every repository instance (provider,
+    // services, controllers) shares it, so invalidation in one place reaches them all.
     /** @var array<string, list<UserRole>> */
     private static array $globalUserRolesCache = [];
+
+    /**
+     * Drop every cached role list for one user (all scopes). Must be called
+     * whenever the user's role assignments change, or stale roles stay
+     * effective for the rest of the process (request, worker, or queue run).
+     */
+    public static function forgetUserGlobalCache(string $userUuid): void
+    {
+        foreach (array_keys(self::$globalUserRolesCache) as $cacheKey) {
+            if (str_starts_with($cacheKey, $userUuid . '_')) {
+                unset(self::$globalUserRolesCache[$cacheKey]);
+            }
+        }
+    }
+
+    public static function flushGlobalCache(): void
+    {
+        self::$globalUserRolesCache = [];
+    }
 
     public function getTableName(): string
     {
@@ -196,10 +213,6 @@ class UserRoleRepository extends BaseRepository
             return self::$globalUserRolesCache[$cacheKey];
         }
 
-        if (isset($this->userRolesCache[$cacheKey])) {
-            return $this->userRolesCache[$cacheKey];
-        }
-
         // Only get active (non-expired) roles
         $currentTime = $this->db->getDriver()->formatDateTime();
 
@@ -223,8 +236,6 @@ class UserRoleRepository extends BaseRepository
 
         $userRoles = array_values($userRoles);
 
-        // Cache the result in both caches
-        $this->userRolesCache[$cacheKey] = $userRoles;
         self::$globalUserRolesCache[$cacheKey] = $userRoles;
 
         return $userRoles;

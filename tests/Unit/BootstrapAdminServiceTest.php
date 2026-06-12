@@ -22,12 +22,7 @@ final class BootstrapAdminServiceTest extends AegisTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // user_roles is not in the base catalog harness; the provider's assignRole writes here.
-        $this->connection->getPDO()->exec('CREATE TABLE user_roles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            uuid TEXT, user_uuid TEXT, role_uuid TEXT, granted_by TEXT, expires_at TEXT,
-            scope TEXT, created_at TEXT, updated_at TEXT, deleted_at TEXT
-        )');
+        // user_roles now ships in the base harness schema (AegisTestCase::createSchema).
         $this->seedPermission(['slug' => 'users.read', 'name' => 'Read users', 'managed_by' => 'glueful/users']);
     }
 
@@ -71,9 +66,11 @@ final class BootstrapAdminServiceTest extends AegisTestCase
     /** @return string[] role slugs assigned to a user */
     private function userRoleSlugs(string $userUuid): array
     {
+        // user_roles has no deleted_at column (see migrations/001) — assignments
+        // are hard-deleted on revoke.
         $stmt = $this->connection->getPDO()->prepare(
             'SELECT r.slug FROM user_roles ur JOIN roles r ON r.uuid = ur.role_uuid
-             WHERE ur.user_uuid = ? AND ur.deleted_at IS NULL'
+             WHERE ur.user_uuid = ?'
         );
         $stmt->execute([$userUuid]);
         return array_map(static fn($r) => (string) $r['slug'], $stmt->fetchAll(\PDO::FETCH_ASSOC));

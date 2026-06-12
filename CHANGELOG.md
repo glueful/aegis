@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Security: privilege mutations now invalidate every permission-cache layer immediately.** Revoking a role or direct permission through the management API (`RoleService` / `PermissionAssignmentService`) wrote to the database only — `AegisPermissionProvider`'s distributed decision caches (`can()` results 15 min, user permission sets 60 min, role-permission checks 30 min) and the repository-level static caches were never invalidated, so a revoked principal kept access until the TTL expired, and a fresh grant could stay masked by a cached negative for up to 15 minutes. Both services now receive the shared provider and invalidate per-user caches on assign/revoke (roles and direct permissions, single and batch) and invalidate broadly on role update/delete and permission update/delete (hierarchy, status, and slug changes affect every member). Catalog sync/prune and `aegis:bootstrap-admin`'s direct role-permission grants invalidate as well. `UserRoleRepository` and `UserPermissionRepository` each collapse their dual instance+static caches into a single static cache with `forgetUserGlobalCache()` / `flushGlobalCache()` hooks, so invalidation in one place reaches every repository instance (provider, services, controllers) — including under persistent workers. Regression-tested end-to-end through `AegisPermissionProvider::can()` (`RevocationCacheInvalidationTest`); the SQLite test harness now ships `user_roles`/`user_permissions` faithful to the real migrations (no `deleted_at` on assignments — `BootstrapAdminServiceTest`'s local table and query were corrected to match).
+
 ## [1.7.0] - 2026-06-11 — RBAC Authorization Hardening
 
 > **Security & correctness release.** Closes a privilege escalation in the RBAC management
