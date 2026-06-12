@@ -362,6 +362,7 @@ class RoleController
                 'errors' => []
             ];
 
+            $actor = $this->actorUuid($request);
             foreach ($data['role_ids'] as $roleUuid) {
                 try {
                     $role = $this->roleRepository->findRecordByUuid($roleUuid);
@@ -374,13 +375,32 @@ class RoleController
                     switch ($data['action']) {
                         case 'delete':
                             $force = $data['force'] ?? false;
-                            $this->roleService->deleteRole($roleUuid, $force);
+                            if (!$this->roleService->deleteRole($roleUuid, $force)) {
+                                throw new \RuntimeException('Delete failed');
+                            }
+                            $this->audit->logRoleDeleted($roleUuid, $role, $actor);
                             break;
                         case 'activate':
-                            $this->roleService->updateRole($roleUuid, ['status' => 'active']);
+                            if (!$this->roleService->updateRole($roleUuid, ['status' => 'active'], $actor)) {
+                                throw new \RuntimeException('Activate failed');
+                            }
+                            $this->audit->logRoleUpdated(
+                                $roleUuid,
+                                $role,
+                                $this->roleRepository->findRecordByUuid($roleUuid) ?? [],
+                                $actor
+                            );
                             break;
                         case 'deactivate':
-                            $this->roleService->updateRole($roleUuid, ['status' => 'inactive']);
+                            if (!$this->roleService->updateRole($roleUuid, ['status' => 'inactive'], $actor)) {
+                                throw new \RuntimeException('Deactivate failed');
+                            }
+                            $this->audit->logRoleUpdated(
+                                $roleUuid,
+                                $role,
+                                $this->roleRepository->findRecordByUuid($roleUuid) ?? [],
+                                $actor
+                            );
                             break;
                         default:
                             throw new \InvalidArgumentException('Invalid action');

@@ -13,6 +13,7 @@ use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
+use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Models\Role;
 use Glueful\Cache\CacheStore;
 
@@ -44,6 +45,7 @@ class AegisPermissionProvider implements
     private ?UserRoleRepository $userRoleRepository = null;
     private ?UserPermissionRepository $userPermissionRepository = null;
     private ?RolePermissionRepository $rolePermissionRepository = null;
+    private ?AuditService $auditService = null;
     /** @var array<string, mixed> */
     private array $config = [
         'cache_ttl' => 3600,
@@ -150,14 +152,27 @@ public function initialize(array $config = []): void
         return $this->rolePermissionRepository;
     }
 
+    private function getAuditService(): AuditService
+    {
+        if ($this->auditService === null) {
+            $this->auditService = new AuditService($this->context);
+        }
+
+        return $this->auditService;
+    }
+
     public function can(string $userUuid, string $permission, string $resource, array $context = []): bool
     {
         // Perform the actual permission check
         if ($this->hasDirectPermission($userUuid, $permission, $resource, $context)) {
+            $this->logPermissionCheck($userUuid, $permission, $resource, true, $context);
             return true;
         }
 
-        return $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
+        $result = $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
+        $this->logPermissionCheck($userUuid, $permission, $resource, $result, $context);
+
+        return $result;
     }
 
     public function getUserPermissions(string $userUuid): array
@@ -908,6 +923,23 @@ public function initialize(array $config = []): void
             $this->cache->deletePattern($pattern);
         } catch (\Exception $e) {
             error_log("Failed to clear permission checks cache for user {$userUuid}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logPermissionCheck(
+        string $userUuid,
+        string $permission,
+        string $resource,
+        bool $allowed,
+        array $context
+    ): void {
+        try {
+            $this->getAuditService()->logPermissionCheck($userUuid, $permission, $resource, $allowed, $context);
+        } catch (\Throwable $e) {
+            error_log("Failed to log RBAC permission check: " . $e->getMessage());
         }
     }
 
