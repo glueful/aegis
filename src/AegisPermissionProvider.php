@@ -152,48 +152,12 @@ public function initialize(array $config = []): void
 
     public function can(string $userUuid, string $permission, string $resource, array $context = []): bool
     {
-        // Generate cache key for this permission check
-        $cacheKey = $this->generateCacheKey('check', $userUuid, [
-            'permission' => $permission,
-            'resource' => $resource,
-            'context' => $context
-        ]);
-
-        // Check cache if enabled and context is cacheable (no dynamic constraints)
-        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
-            try {
-                $cached = $this->cache->get($cacheKey);
-                if ($cached !== null) {
-                    return (bool)$cached;
-                }
-            } catch (\Exception $e) {
-                // Log but continue without cache
-                error_log("Cache read failed for permission check: " . $e->getMessage());
-            }
-        }
-
         // Perform the actual permission check
-        $result = false;
-
-        // First check direct user permissions (these override role permissions)
         if ($this->hasDirectPermission($userUuid, $permission, $resource, $context)) {
-            $result = true;
-        } else {
-            // Then check role-based permissions
-            $result = $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
+            return true;
         }
 
-        // Cache the result if context is cacheable
-        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
-            try {
-                // Cache permission checks for a shorter time (15 minutes)
-                $this->cache->set($cacheKey, $result, 900);
-            } catch (\Exception $e) {
-                error_log("Cache write failed for permission check: " . $e->getMessage());
-            }
-        }
-
-        return $result;
+        return $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
     }
 
     public function getUserPermissions(string $userUuid): array
@@ -699,15 +663,6 @@ public function initialize(array $config = []): void
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
-        // Create cache key based on user UUID and scope
-        $scopeHash = md5(serialize($scope));
-        $cacheKey = "{$userUuid}:{$scopeHash}";
-
-        // Return cached result if available
-        if (isset($this->userRolesCache[$cacheKey])) {
-            return $this->userRolesCache[$cacheKey];
-        }
-
         $userRoles = $this->getUserRoleRepository()->getUserRoles($userUuid, $scope);
         $roles = [];
 
@@ -733,9 +688,6 @@ public function initialize(array $config = []): void
                 }
             }
         }
-
-        // Cache the result
-        $this->userRolesCache[$cacheKey] = $roles;
 
         return $roles;
     }
@@ -827,44 +779,13 @@ public function initialize(array $config = []): void
             return false;
         }
 
-        // Generate cache key for this role-permission check
-        $cacheKey = $this->generateCacheKey('role_permission', $role->getUuid(), [
-            'permission' => $permission,
-            'resource' => $resource
-        ]);
-
-        // Check cache if enabled
-        if ($this->cacheEnabled && $this->cache !== null) {
-            try {
-                $cached = $this->cache->get($cacheKey);
-                if ($cached !== null) {
-                    return (bool)$cached;
-                }
-            } catch (\Exception $e) {
-                // Log but continue without cache
-                error_log("Cache read failed for role permission check: " . $e->getMessage());
-            }
-        }
-
         // Check if role has this permission
         $context = $resource !== '*' ? ['resource' => $resource] : [];
-        $result = $this->getRolePermissionRepository()->roleHasPermission(
+        return $this->getRolePermissionRepository()->roleHasPermission(
             $role->getUuid(),
             $permissionModel->getUuid(),
             $context
         );
-
-        // Cache the result
-        if ($this->cacheEnabled && $this->cache !== null) {
-            try {
-                // Cache role permission checks for 30 minutes
-                $this->cache->set($cacheKey, $result, 1800);
-            } catch (\Exception $e) {
-                error_log("Cache write failed for role permission check: " . $e->getMessage());
-            }
-        }
-
-        return $result;
     }
 
     /** @return array<string, list<string>> */
@@ -990,18 +911,4 @@ public function initialize(array $config = []): void
         }
     }
 
-    /** @param array<string, mixed> $context */
-    private function isContextCacheable(array $context): bool
-    {
-        // Don't cache if context contains time-sensitive data
-        $nonCacheableKeys = ['ip', 'timestamp', 'session_id', 'request_id'];
-
-        foreach ($nonCacheableKeys as $key) {
-            if (isset($context[$key])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

@@ -113,7 +113,7 @@ class UserPermissionRepository extends BaseRepository
         // Create cache key based on user UUID and filters
         $cacheKey = $userUuid . '_' . md5(serialize($filters));
 
-        if (isset(self::$userPermissionsCache[$cacheKey])) {
+        if (!($filters['active_only'] ?? false) && isset(self::$userPermissionsCache[$cacheKey])) {
             return self::$userPermissionsCache[$cacheKey];
         }
 
@@ -138,8 +138,10 @@ class UserPermissionRepository extends BaseRepository
         $results = $query->get();
         $userPermissions = array_map(fn($row) => new UserPermission($row), $results);
 
-        // Cache the result
-        self::$userPermissionsCache[$cacheKey] = $userPermissions;
+        // Active grant lists are time-sensitive; caching them can let expired grants survive.
+        if (!($filters['active_only'] ?? false)) {
+            self::$userPermissionsCache[$cacheKey] = $userPermissions;
+        }
 
         return $userPermissions;
     }

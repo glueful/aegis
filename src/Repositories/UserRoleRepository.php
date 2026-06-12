@@ -205,14 +205,6 @@ class UserRoleRepository extends BaseRepository
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
-        // Create cache key based on user UUID and scope
-        $cacheKey = $userUuid . '_' . md5(serialize($scope));
-
-        // Check static cache first (works across all instances)
-        if (isset(self::$globalUserRolesCache[$cacheKey])) {
-            return self::$globalUserRolesCache[$cacheKey];
-        }
-
         // Only get active (non-expired) roles
         $currentTime = $this->db->getDriver()->formatDateTime();
 
@@ -235,8 +227,6 @@ class UserRoleRepository extends BaseRepository
         }
 
         $userRoles = array_values($userRoles);
-
-        self::$globalUserRolesCache[$cacheKey] = $userRoles;
 
         return $userRoles;
     }
