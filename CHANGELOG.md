@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-06-13
+
 ### Changed
 - **Single authorization engine: the management API's permission check now delegates to the runtime provider.** `PermissionAssignmentService::userHasPermission()` (backing `POST /rbac/check-permission`) previously ran its own parallel direct/role/hierarchy walk that could drift from `AegisPermissionProvider::can()` — for example it always walked the role hierarchy regardless of the `enable_hierarchy`/`enable_inheritance` config the runtime engine honors. It now delegates to `can()`, so the dry-run check answers exactly what enforcement answers (including scope handling, deny-by-default, and audit logging). The service's private check helpers and the dead, caller-less `getUserEffectivePermissionsOptimized()` were removed, and the provider is now a required constructor dependency. `getUserEffectivePermissions()` remains as a reporting/enumeration API (it returns grant provenance the boolean engine doesn't). Pinned by `PermissionCheckConsolidationTest`.
 
