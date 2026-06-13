@@ -13,6 +13,7 @@ use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
+use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Models\Role;
 use Glueful\Cache\CacheStore;
 
@@ -44,6 +45,7 @@ class AegisPermissionProvider implements
     private ?UserRoleRepository $userRoleRepository = null;
     private ?UserPermissionRepository $userPermissionRepository = null;
     private ?RolePermissionRepository $rolePermissionRepository = null;
+    private ?AuditService $auditService = null;
     /** @var array<string, mixed> */
     private array $config = [
         'cache_ttl' => 3600,
@@ -150,48 +152,25 @@ public function initialize(array $config = []): void
         return $this->rolePermissionRepository;
     }
 
+    private function getAuditService(): AuditService
+    {
+        if ($this->auditService === null) {
+            $this->auditService = new AuditService($this->context);
+        }
+
+        return $this->auditService;
+    }
+
     public function can(string $userUuid, string $permission, string $resource, array $context = []): bool
     {
-        // Generate cache key for this permission check
-        $cacheKey = $this->generateCacheKey('check', $userUuid, [
-            'permission' => $permission,
-            'resource' => $resource,
-            'context' => $context
-        ]);
-
-        // Check cache if enabled and context is cacheable (no dynamic constraints)
-        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
-            try {
-                $cached = $this->cache->get($cacheKey);
-                if ($cached !== null) {
-                    return (bool)$cached;
-                }
-            } catch (\Exception $e) {
-                // Log but continue without cache
-                error_log("Cache read failed for permission check: " . $e->getMessage());
-            }
-        }
-
         // Perform the actual permission check
-        $result = false;
-
-        // First check direct user permissions (these override role permissions)
         if ($this->hasDirectPermission($userUuid, $permission, $resource, $context)) {
-            $result = true;
-        } else {
-            // Then check role-based permissions
-            $result = $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
+            $this->logPermissionCheck($userUuid, $permission, $resource, true, $context);
+            return true;
         }
 
-        // Cache the result if context is cacheable
-        if ($this->cacheEnabled && $this->cache !== null && $this->isContextCacheable($context)) {
-            try {
-                // Cache permission checks for a shorter time (15 minutes)
-                $this->cache->set($cacheKey, $result, 900);
-            } catch (\Exception $e) {
-                error_log("Cache write failed for permission check: " . $e->getMessage());
-            }
-        }
+        $result = $this->hasRoleBasedPermission($userUuid, $permission, $resource, $context);
+        $this->logPermissionCheck($userUuid, $permission, $resource, $result, $context);
 
         return $result;
     }
@@ -323,7 +302,11 @@ public function initialize(array $config = []): void
     /** @param string[] $slugs */
     public function pruneCatalog(array $slugs): int
     {
-        return $this->getPermissionRepository()->deleteManagedBySlugs($slugs);
+        $deleted = $this->getPermissionRepository()->deleteManagedBySlugs($slugs);
+        if ($deleted > 0) {
+            $this->invalidateAllCache();
+        }
+        return $deleted;
     }
 
     /** @return array<string, string> */
@@ -335,7 +318,11 @@ public function initialize(array $config = []): void
     /** @param string[] $roleSlugs */
     public function pruneRoles(array $roleSlugs): int
     {
-        return $this->getRoleRepository()->deleteManagedBySlugs($roleSlugs);
+        $deleted = $this->getRoleRepository()->deleteManagedBySlugs($roleSlugs);
+        if ($deleted > 0) {
+            $this->invalidateAllCache();
+        }
+        return $deleted;
     }
 
     /**
@@ -396,6 +383,13 @@ public function initialize(array $config = []): void
             if (!isset($declaredSlugs[$slug])) {
                 $stale[] = $slug;
             }
+        }
+
+        // Catalog sync rewrites permissions and role grants — cached decisions,
+        // user permission sets, and role_permission:* check results are all
+        // potentially stale now.
+        if ($created > 0 || $updated > 0 || $roles !== []) {
+            $this->invalidateAllCache();
         }
 
         return new SyncResult($created, $updated, $unchanged, $stale);
@@ -541,6 +535,11 @@ public function initialize(array $config = []): void
             unset($this->userRolesCache[$key]);
         }
 
+        // Clear the repository-level static caches — they are shared across all
+        // repository instances, so a stale entry there would survive everything above.
+        UserRoleRepository::forgetUserGlobalCache($userUuid);
+        UserPermissionRepository::forgetUserGlobalCache($userUuid);
+
         // Clear distributed cache if enabled
         if ($this->cacheEnabled && $this->cache !== null) {
             try {
@@ -560,8 +559,11 @@ public function initialize(array $config = []): void
 
     public function invalidateAllCache(): void
     {
-        // Clear memory cache
+        // Clear memory caches
         $this->permissionCache = [];
+        $this->userRolesCache = [];
+        UserRoleRepository::flushGlobalCache();
+        UserPermissionRepository::flushGlobalCache();
 
         // Clear distributed cache if enabled
         if ($this->cacheEnabled && $this->cache !== null) {
@@ -676,15 +678,6 @@ public function initialize(array $config = []): void
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
-        // Create cache key based on user UUID and scope
-        $scopeHash = md5(serialize($scope));
-        $cacheKey = "{$userUuid}:{$scopeHash}";
-
-        // Return cached result if available
-        if (isset($this->userRolesCache[$cacheKey])) {
-            return $this->userRolesCache[$cacheKey];
-        }
-
         $userRoles = $this->getUserRoleRepository()->getUserRoles($userUuid, $scope);
         $roles = [];
 
@@ -710,9 +703,6 @@ public function initialize(array $config = []): void
                 }
             }
         }
-
-        // Cache the result
-        $this->userRolesCache[$cacheKey] = $roles;
 
         return $roles;
     }
@@ -764,7 +754,7 @@ public function initialize(array $config = []): void
         string $resource,
         array $context = []
     ): bool {
-        $userRoles = $this->getUserRoles($userUuid);
+        $userRoles = $this->getUserRoles($userUuid, $this->scopeFromContext($context));
 
         foreach ($userRoles as $role) {
             if ($this->roleHasPermission($role, $permission, $resource)) {
@@ -785,6 +775,17 @@ public function initialize(array $config = []): void
         return false;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function scopeFromContext(array $context): array
+    {
+        $scope = $context['scope'] ?? [];
+
+        return is_array($scope) ? $scope : [];
+    }
+
     private function roleHasPermission(Role $role, string $permission, string $resource): bool
     {
         // Check if permission exists
@@ -793,44 +794,13 @@ public function initialize(array $config = []): void
             return false;
         }
 
-        // Generate cache key for this role-permission check
-        $cacheKey = $this->generateCacheKey('role_permission', $role->getUuid(), [
-            'permission' => $permission,
-            'resource' => $resource
-        ]);
-
-        // Check cache if enabled
-        if ($this->cacheEnabled && $this->cache !== null) {
-            try {
-                $cached = $this->cache->get($cacheKey);
-                if ($cached !== null) {
-                    return (bool)$cached;
-                }
-            } catch (\Exception $e) {
-                // Log but continue without cache
-                error_log("Cache read failed for role permission check: " . $e->getMessage());
-            }
-        }
-
         // Check if role has this permission
         $context = $resource !== '*' ? ['resource' => $resource] : [];
-        $result = $this->getRolePermissionRepository()->roleHasPermission(
+        return $this->getRolePermissionRepository()->roleHasPermission(
             $role->getUuid(),
             $permissionModel->getUuid(),
             $context
         );
-
-        // Cache the result
-        if ($this->cacheEnabled && $this->cache !== null) {
-            try {
-                // Cache role permission checks for 30 minutes
-                $this->cache->set($cacheKey, $result, 1800);
-            } catch (\Exception $e) {
-                error_log("Cache write failed for role permission check: " . $e->getMessage());
-            }
-        }
-
-        return $result;
     }
 
     /** @return array<string, list<string>> */
@@ -956,18 +926,21 @@ public function initialize(array $config = []): void
         }
     }
 
-    /** @param array<string, mixed> $context */
-    private function isContextCacheable(array $context): bool
-    {
-        // Don't cache if context contains time-sensitive data
-        $nonCacheableKeys = ['ip', 'timestamp', 'session_id', 'request_id'];
-
-        foreach ($nonCacheableKeys as $key) {
-            if (isset($context[$key])) {
-                return false;
-            }
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logPermissionCheck(
+        string $userUuid,
+        string $permission,
+        string $resource,
+        bool $allowed,
+        array $context
+    ): void {
+        try {
+            $this->getAuditService()->logPermissionCheck($userUuid, $permission, $resource, $allowed, $context);
+        } catch (\Throwable $e) {
+            error_log("Failed to log RBAC permission check: " . $e->getMessage());
         }
-
-        return true;
     }
+
 }

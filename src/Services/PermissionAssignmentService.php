@@ -2,6 +2,7 @@
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
@@ -44,13 +45,36 @@ class PermissionAssignmentService
         UserPermissionRepository $userPermissionRepository,
         RoleRepository $roleRepository,
         UserRoleRepository $userRoleRepository,
-        RolePermissionRepository $rolePermissionRepository
+        RolePermissionRepository $rolePermissionRepository,
+        private readonly AegisPermissionProvider $permissionProvider
     ) {
         $this->permissionRepository = $permissionRepository;
         $this->userPermissionRepository = $userPermissionRepository;
         $this->roleRepository = $roleRepository;
         $this->userRoleRepository = $userRoleRepository;
         $this->rolePermissionRepository = $rolePermissionRepository;
+    }
+
+    /**
+     * Drop cached state for one user after a privilege mutation — both this
+     * service's request-local cache and the provider's distributed decision
+     * caches. Without the provider call, a revoked permission stays effective
+     * (and a fresh grant stays masked by a cached negative) until the TTL.
+     */
+    private function invalidateUserPermissionState(string $userUuid): void
+    {
+        foreach (array_keys($this->cache['user_permissions']) as $key) {
+            if (str_starts_with((string) $key, $userUuid . '_')) {
+                unset($this->cache['user_permissions'][$key]);
+            }
+        }
+        foreach (array_keys($this->cache['user_roles']) as $key) {
+            if (str_starts_with((string) $key, $userUuid . '_')) {
+                unset($this->cache['user_roles'][$key]);
+            }
+        }
+
+        $this->permissionProvider->invalidateUserCache($userUuid);
     }
 
     /**
@@ -94,7 +118,11 @@ class PermissionAssignmentService
 
         try {
             $result = $this->userPermissionRepository->create($data);
-            return !empty($result);
+            if (!empty($result)) {
+                $this->invalidateUserPermissionState($userUuid);
+                return true;
+            }
+            return false;
         } catch (\Exception) {
             return false;
         }
@@ -110,7 +138,13 @@ class PermissionAssignmentService
             return false; // Permission doesn't exist, consider it revoked
         }
 
-        return $this->userPermissionRepository->revokeUserPermission($userUuid, $permission->getUuid());
+        $revoked = $this->userPermissionRepository->revokeUserPermission($userUuid, $permission->getUuid());
+
+        if ($revoked) {
+            $this->invalidateUserPermissionState($userUuid);
+        }
+
+        return $revoked;
     }
 
     /**
@@ -317,6 +351,11 @@ class PermissionAssignmentService
     /**
      * Check if user has specific permission
      *
+     * Delegates to AegisPermissionProvider::can() — the single authorization
+     * engine. This service used to run its own parallel direct/role/hierarchy
+     * walk, which could (and did) drift from runtime decisions; the management
+     * API's dry-run check must answer exactly what enforcement would answer.
+     *
      * @param array<string, mixed> $context
      */
     public function userHasPermission(
@@ -325,18 +364,7 @@ class PermissionAssignmentService
         string $resource = '*',
         array $context = []
     ): bool {
-        $permission = $this->permissionRepository->findPermissionBySlug($permissionSlug);
-        if (!$permission) {
-            return false;
-        }
-
-        // Check direct permissions first
-        if ($this->hasDirectPermission($userUuid, $permission->getUuid(), $resource, $context)) {
-            return true;
-        }
-
-        // Check role-based permissions
-        return $this->hasRoleBasedPermission($userUuid, $permission->getUuid(), $resource, $context);
+        return $this->permissionProvider->can($userUuid, $permissionSlug, $resource, $context);
     }
 
     /**
@@ -408,7 +436,16 @@ class PermissionAssignmentService
             $data['metadata'] = json_encode($data['metadata']);
         }
 
-        return $this->permissionRepository->update($uuid, $data);
+        $updated = $this->permissionRepository->update($uuid, $data);
+
+        // Slug/metadata changes affect every cached decision that named this
+        // permission — there is no per-permission cache index, so clear broadly.
+        if ($updated) {
+            $this->cache = ['user_roles' => [], 'user_permissions' => [], 'role_permissions' => []];
+            $this->permissionProvider->invalidateAllCache();
+        }
+
+        return $updated;
     }
 
     /**
@@ -439,7 +476,14 @@ class PermissionAssignmentService
             }
         }
 
-        return $this->permissionRepository->delete($uuid);
+        $deleted = $this->permissionRepository->delete($uuid);
+
+        if ($deleted) {
+            $this->cache = ['user_roles' => [], 'user_permissions' => [], 'role_permissions' => []];
+            $this->permissionProvider->invalidateAllCache();
+        }
+
+        return $deleted;
     }
 
     /**
@@ -459,74 +503,6 @@ class PermissionAssignmentService
     }
 
     // Private helper methods
-
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function hasDirectPermission(
-        string $userUuid,
-        string $permissionUuid,
-        string $resource,
-        array $context
-    ): bool {
-        $userPermissions = $this->userPermissionRepository->findByUser($userUuid, [
-            'permission_uuid' => $permissionUuid,
-            'active_only' => true
-        ]);
-
-        foreach ($userPermissions as $userPermission) {
-            $resourceContext = $resource !== '*' ? ['resource' => $resource] : [];
-
-            if (
-                $userPermission->matchesResource($resourceContext) &&
-                $userPermission->satisfiesConstraints($context)
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function hasRoleBasedPermission(
-        string $userUuid,
-        string $permissionUuid,
-        string $resource,
-        array $context
-    ): bool {
-        // Get user's active roles
-        $userRoles = $this->userRoleRepository->getUserRoles($userUuid, $context['scope'] ?? []);
-
-        if (empty($userRoles)) {
-            return false;
-        }
-
-        // Check each role for the permission
-        foreach ($userRoles as $userRole) {
-            $role = $this->roleRepository->findRoleByUuid($userRole->getRoleUuid());
-            if (!$role) {
-                continue;
-            }
-
-            // Check if this role has the permission
-            if ($this->roleHasPermission($role->getUuid(), $permissionUuid, $resource)) {
-                return true;
-            }
-
-            // Check role hierarchy (parent roles) if inheritance is enabled
-            $parentRoles = $this->roleRepository->getRoleHierarchy($role->getUuid());
-            foreach ($parentRoles as $parentRole) {
-                if ($this->roleHasPermission($parentRole->getUuid(), $permissionUuid, $resource)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
 
     /**
      * @param array<string, mixed> $scope
@@ -599,20 +575,6 @@ class PermissionAssignmentService
     }
 
     /**
-     * Check if a role has a specific permission
-     */
-    private function roleHasPermission(string $roleUuid, string $permissionUuid, string $resource): bool
-    {
-        $context = $resource !== '*' ? ['resource' => $resource] : [];
-
-        return $this->rolePermissionRepository->roleHasPermission(
-            $roleUuid,
-            $permissionUuid,
-            $context
-        );
-    }
-
-    /**
      * Get all permissions for a role
      *
      * @return list<array<string, mixed>>
@@ -664,65 +626,4 @@ class PermissionAssignmentService
         return $permissions;
     }
 
-    /**
-     * Get user's effective permissions using pre-fetched data to avoid duplicate queries
-     *
-     * @param string $userUuid
-     * @param list<array<string, mixed>> $directPermissions Already fetched direct permissions
-     * @param list<array<string, mixed>> $roles Already fetched user roles
-     * @param array<string, mixed> $scope Optional scope filter
-     * @return array<string, list<array<string, mixed>>>
-     */
-    public function getUserEffectivePermissionsOptimized(
-        string $userUuid,
-        array $directPermissions = [],
-        array $roles = [],
-        array $scope = []
-    ): array {
-        $effectivePermissions = [];
-
-        // Process direct permissions
-        foreach ($directPermissions as $permData) {
-            $slug = $permData['permission']->getSlug();
-            $resourceFilter = $permData['resource_filter'];
-            $resource = $resourceFilter['resource'] ?? '*';
-
-            if (!isset($effectivePermissions[$resource])) {
-                $effectivePermissions[$resource] = [];
-            }
-
-            $effectivePermissions[$resource][] = [
-                'permission' => $slug,
-                'source' => 'direct',
-                'expires_at' => $permData['expires_at'],
-                'constraints' => $permData['constraints']
-            ];
-        }
-
-        // Process role-based permissions using pre-fetched roles
-        foreach ($roles as $roleData) {
-            $role = $roleData['role'] ?? null;
-            if (!$role || !isset($role->uuid)) {
-                continue;
-            }
-
-            $rolePermissions = $this->getRolePermissions($role->uuid);
-            foreach ($rolePermissions as $permission) {
-                $resource = $permission['resource_filter'] ?? '*';
-
-                if (!isset($effectivePermissions[$resource])) {
-                    $effectivePermissions[$resource] = [];
-                }
-
-                $effectivePermissions[$resource][] = [
-                    'permission' => $permission['permission_slug'],
-                    'source' => 'role',
-                    'role' => $role->name ?? 'Unknown',
-                    'expires_at' => null // Role permissions don't expire individually
-                ];
-            }
-        }
-
-        return $effectivePermissions;
-    }
 }

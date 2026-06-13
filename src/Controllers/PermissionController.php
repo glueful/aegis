@@ -317,12 +317,44 @@ class PermissionController
                 );
             }
 
-            $globalOptions = $data['options'] ?? [];
+            $actor = $this->actorUuid($request);
+            $globalOptions = array_merge($data['options'] ?? [], ['granted_by' => $actor]);
+            $auditDataBySlug = [];
+            foreach ($data['permissions'] as $permissionData) {
+                $slug = $permissionData['permission'] ?? '';
+                if ($slug === '') {
+                    continue;
+                }
+                $auditDataBySlug[$slug] = array_merge(
+                    $globalOptions,
+                    $permissionData['options'] ?? [],
+                    ['resource' => $permissionData['resource'] ?? '*']
+                );
+            }
+
             $results = $this->permissionService->batchAssignPermissions(
                 $data['user_uuid'],
                 $data['permissions'],
                 $globalOptions
             );
+
+            foreach ($results['results'] ?? [] as $result) {
+                if (($result['success'] ?? false) !== true) {
+                    continue;
+                }
+
+                $permission = $this->permissionRepository->findPermissionBySlug((string) ($result['permission'] ?? ''));
+                if ($permission === null) {
+                    continue;
+                }
+
+                $this->audit->logPermissionAssigned(
+                    $data['user_uuid'],
+                    $permission->getUuid(),
+                    $auditDataBySlug[$result['permission']] ?? ['resource' => $result['resource'] ?? '*'],
+                    $actor
+                );
+            }
 
             return Response::success($results, 'Batch permission assignment completed');
         } catch (\Exception $e) {
@@ -354,6 +386,20 @@ class PermissionController
                 $data['user_uuid'],
                 $data['permission_slugs']
             );
+
+            $actor = $this->actorUuid($request);
+            foreach ($results['results'] ?? [] as $result) {
+                if (($result['success'] ?? false) !== true) {
+                    continue;
+                }
+
+                $permission = $this->permissionRepository->findPermissionBySlug((string) ($result['permission'] ?? ''));
+                if ($permission === null) {
+                    continue;
+                }
+
+                $this->audit->logPermissionRevoked($data['user_uuid'], $permission->getUuid(), $actor);
+            }
 
             return Response::success($results, 'Batch permission revocation completed');
         } catch (\Exception $e) {

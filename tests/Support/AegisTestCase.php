@@ -8,6 +8,7 @@ use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Database\Connection;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
+use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Helpers\Utils;
 use PHPUnit\Framework\TestCase;
 
@@ -34,8 +35,11 @@ abstract class AegisTestCase extends TestCase
         $this->createSchema();
         // Register as the shared repository connection (BaseRepository::$sharedConnection).
         new PermissionRepository($this->connection);
-        // Static lookup cache persists across cases (distinct DBs) — clear for isolation.
+        // Static lookup caches persist across cases (distinct DBs) — clear for isolation.
         PermissionRepository::clearCache();
+        RoleRepository::clearCache();
+        \Glueful\Extensions\Aegis\Repositories\UserRoleRepository::flushGlobalCache();
+        \Glueful\Extensions\Aegis\Repositories\UserPermissionRepository::flushGlobalCache();
     }
 
     protected function tearDown(): void
@@ -67,6 +71,16 @@ abstract class AegisTestCase extends TestCase
             uuid TEXT, role_uuid TEXT, permission_uuid TEXT, resource_filter TEXT,
             constraints TEXT, granted_by TEXT, expires_at TEXT,
             created_at TEXT, updated_at TEXT, deleted_at TEXT
+        )');
+        $pdo->exec('CREATE TABLE user_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT, user_uuid TEXT, role_uuid TEXT, scope TEXT,
+            granted_by TEXT, expires_at TEXT, created_at TEXT
+        )');
+        $pdo->exec('CREATE TABLE user_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT, user_uuid TEXT, permission_uuid TEXT, resource_filter TEXT,
+            constraints TEXT, granted_by TEXT, expires_at TEXT, created_at TEXT
         )');
     }
 

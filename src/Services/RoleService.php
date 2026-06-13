@@ -2,6 +2,7 @@
 
 namespace Glueful\Extensions\Aegis\Services;
 
+use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
 use Glueful\Extensions\Aegis\Models\Role;
@@ -32,8 +33,11 @@ class RoleService
      */
     private array $userRolesCache = [];
 
-    public function __construct(RoleRepository $roleRepository, UserRoleRepository $userRoleRepository)
-    {
+    public function __construct(
+        RoleRepository $roleRepository,
+        UserRoleRepository $userRoleRepository,
+        private readonly ?AegisPermissionProvider $permissionProvider = null
+    ) {
         $this->roleRepository = $roleRepository;
         $this->userRoleRepository = $userRoleRepository;
     }
@@ -136,6 +140,14 @@ class RoleService
                         throw new \InvalidArgumentException('Circular role hierarchy detected');
                     }
 
+                    if ($updatedBy !== null && $updatedBy !== '') {
+                        $this->assertActorCanManageRole(
+                            $updatedBy,
+                            $parentRole,
+                            'Cannot set a role parent the actor does not hold or outrank'
+                        );
+                    }
+
                     $data['level'] = $parentRole->getLevel() + 1;
                 } else {
                     $data['level'] = 0;
@@ -151,7 +163,16 @@ class RoleService
             $data['metadata'] = json_encode($data['metadata']);
         }
 
-        return $this->roleRepository->update($uuid, $data);
+        $updated = $this->roleRepository->update($uuid, $data);
+
+        // Hierarchy/status/slug changes affect every member of this role (and
+        // its descendants) — cached decisions must not outlive the change.
+        if ($updated) {
+            $this->clearUserRolesCache();
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $updated;
     }
 
     /**
@@ -197,7 +218,14 @@ class RoleService
             }
         }
 
-        return $this->roleRepository->delete($uuid);
+        $deleted = $this->roleRepository->delete($uuid);
+
+        if ($deleted) {
+            $this->clearUserRolesCache();
+            $this->permissionProvider?->invalidateAllCache();
+        }
+
+        return $deleted;
     }
 
     /**
@@ -216,6 +244,15 @@ class RoleService
             throw new \InvalidArgumentException('Cannot assign inactive role');
         }
 
+        $actorUuid = $this->assignmentActor($options);
+        if ($actorUuid !== null) {
+            $this->assertActorCanManageRole(
+                $actorUuid,
+                $role,
+                'Cannot assign a role the actor does not hold or outrank'
+            );
+        }
+
         // Check if already assigned
         $scope = $options['scope'] ?? [];
         if ($this->userRoleRepository->hasUserRole($userUuid, $roleUuid, $scope)) {
@@ -224,9 +261,11 @@ class RoleService
 
         $assignment = $this->userRoleRepository->assignRole($userUuid, $roleUuid, $options);
 
-        // Invalidate cache for this user
+        // Invalidate every cache layer for this user — including the provider's
+        // distributed decision caches, or a cached negative masks the new grant.
         if ($assignment !== null) {
             $this->invalidateUserRolesCache($userUuid);
+            $this->permissionProvider?->invalidateUserCache($userUuid);
         }
 
         return $assignment !== null;
@@ -239,9 +278,12 @@ class RoleService
     {
         $result = $this->userRoleRepository->revokeRole($userUuid, $roleUuid);
 
-        // Invalidate cache for this user
+        // Invalidate every cache layer for this user — including the provider's
+        // distributed decision caches, or the revoked role stays effective
+        // until the cache TTL expires (up to an hour).
         if ($result) {
             $this->invalidateUserRolesCache($userUuid);
+            $this->permissionProvider?->invalidateUserCache($userUuid);
         }
 
         return $result;
@@ -369,6 +411,46 @@ class RoleService
             // Recursively update grandchildren
             $this->updateChildRoleLevels($child->getUuid());
         }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function assignmentActor(array $options): ?string
+    {
+        $actor = $options['assigned_by'] ?? $options['granted_by'] ?? null;
+
+        return is_string($actor) && $actor !== '' ? $actor : null;
+    }
+
+    private function assertActorCanManageRole(string $actorUuid, Role $targetRole, string $message): void
+    {
+        if ($this->actorCanManageRole($actorUuid, $targetRole)) {
+            return;
+        }
+
+        throw new \InvalidArgumentException($message);
+    }
+
+    private function actorCanManageRole(string $actorUuid, Role $targetRole): bool
+    {
+        $actorRoleUuids = $this->userRoleRepository->getUserRoleUuids($actorUuid);
+        if ($actorRoleUuids === []) {
+            return false;
+        }
+
+        $manageableRoleUuids = array_map(
+            static fn(Role $role): string => $role->getUuid(),
+            $this->roleRepository->getRoleHierarchy($targetRole->getUuid())
+        );
+
+        foreach ($actorRoleUuids as $actorRoleUuid) {
+            if (in_array($actorRoleUuid, $manageableRoleUuids, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

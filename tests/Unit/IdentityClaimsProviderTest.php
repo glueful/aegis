@@ -20,7 +20,9 @@ final class IdentityClaimsProviderTest extends AegisTestCase
 
     private function createUserRolesTable(): void
     {
-        $this->connection->getPDO()->exec('CREATE TABLE user_roles (
+        // AegisTestCase now ships user_roles in the base schema; keep this
+        // self-contained call harmless.
+        $this->connection->getPDO()->exec('CREATE TABLE IF NOT EXISTS user_roles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             uuid TEXT, user_uuid TEXT, role_uuid TEXT, scope TEXT,
             granted_by TEXT, expires_at TEXT, created_at TEXT

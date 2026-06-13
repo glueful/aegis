@@ -6,13 +6,13 @@ Aegis provides a comprehensive, modern Role-Based Access Control (RBAC) system f
 
 ## Features
 
-- **Hierarchical roles**: Create nested roles with inheritance
-- **Direct user permissions**: Per-user grants that override role permissions
+- **Hierarchical roles**: Create nested roles where child roles inherit ancestor permissions
+- **Direct user permissions**: Per-user grants that augment role permissions
 - **Resource-level filters**: Limit permissions to specific resources/types
 - **Temporal permissions**: Expiry on roles and direct grants
 - **Scoped access**: Multi-tenant friendly with scoping
 - **Audit service**: Structured audit helpers + optional check logging
-- **Multi-layer caching**: In-memory + distributed cache via CacheStore
+- **Targeted caching**: Catalog and non-temporal lookup caches via CacheStore
 - **REST API**: Full CRUD + assignment endpoints
 - **Flexible config**: Tunable caching, inheritance, and logging
 
@@ -194,11 +194,11 @@ Aegis creates the following tables:
 - `role_permissions`: Role-to-permission mappings
 - `user_roles`: User role assignments with scope and expiry support
 - `user_permissions`: Direct user permission assignments
-- `permission_audit`: Audit records for permission/role changes
+- `permission_audit`: Reserved schema for database audit trails; the current audit service writes structured events to the `rbac_audit` log channel.
 
 ## Configuration
 
-Configuration is loaded from `Aegis/config/rbac.php` and merged by the service provider. Example:
+`config/rbac.php` ships empty so the extension can run with framework defaults. Applications can override the following keys in their app config:
 
 ```php
 <?php
@@ -288,7 +288,7 @@ $permission = $permissionService->createPermission([
     'resource_type' => 'posts',
 ]);
 
-// Assign permission directly to user (overrides role permissions)
+// Assign permission directly to user (adds to role permissions)
 $permissionService->assignPermissionToUser(
     $userUuid,
     'posts.edit',
@@ -302,10 +302,12 @@ $permissionService->assignPermissionToUser(
 // Batch assign permissions
 $permissionService->batchAssignPermissions($userUuid, [
     ['permission' => 'posts.read', 'resource' => '*'],
-    ['permission' => 'posts.edit', 'resource' => 'post:*'],
+    ['permission' => 'posts.edit', 'resource' => 'post:123'],
     ['permission' => 'comments.moderate', 'resource' => '*'],
 ]);
 ```
+
+Direct user grants use exact resource matching. Wildcard resource filters are supported on role-permission grants; direct user grants are intended for precise per-user exceptions.
 
 ### Using the RBAC Permission Provider
 
@@ -388,7 +390,7 @@ $employeeRole = $roleService->createRole([
     'level' => 2
 ]);
 
-// Users with admin role automatically inherit manager and employee permissions
+// Users with the employee role inherit manager and admin permissions through their ancestors.
 ```
 
 ## Scoped Permissions
@@ -420,16 +422,15 @@ use Glueful\Extensions\Aegis\Services\AuditService;
 $audit = container()->get(AuditService::class);
 $audit->logSecurityEvent('unauthorized_access', ['path' => '/rbac/roles'], $userUuid ?? null);
 
-// In config (Aegis/config/rbac.php):
+// In app config:
 // 'logging' => ['log_check_operations' => true]
 // When enabled, permission checks are logged to the 'rbac_audit' channel.
 ```
 
 ## Caching
 
-- **Memory cache**: In-process caching for the current request
-- **Distributed cache**: Backed by `CacheStore` for cross-request caching
-- **TTL**: Permission checks cached for 15 minutes; user permissions use `permissions.cache_ttl` (default 3600s)
+- **Catalog and lookup caches**: Non-temporal catalog lookups and permission summaries can use in-process or distributed cache.
+- **Temporal safety**: Final authorization decisions and active temporal grants are not cached past their `expires_at`.
 
 ```php
 // Clear a user’s RBAC cache
@@ -441,10 +442,8 @@ $rbacProvider->invalidateAllCache();
 
 ## Performance Considerations
 
-- Permission checks cached ~15 minutes
-- User permissions cached per `permissions.cache_ttl`
 - Batched lookups to minimize N+1 queries
-- Prefer resource-specific permissions to improve cache effectiveness
+- Prefer role-level resource filters and scoped assignments to keep permission sets focused
 
 ## Security Considerations
 
@@ -452,7 +451,7 @@ $rbacProvider->invalidateAllCache();
 - Circular hierarchies are prevented
 - All endpoints require authentication and proper permissions
 - Optional audit trails improve accountability
-- Cache keys include security context
+- Expiring grants are evaluated against the database on the active authorization path
 
 ## Migration from Legacy Systems
 
@@ -469,12 +468,12 @@ If migrating from an existing permission system:
 
 1. **Permissions not working**: Confirm Aegis is enabled and DB tables exist; use `permission.manager` for checks.
 2. **Cache issues**: Clear RBAC cache via `invalidateUserCache()`/`invalidateAllCache()`.
-3. **Performance issues**: Enable caching and scope permissions/resources.
+3. **Performance issues**: Use role-level resource filters and scoped assignments to keep permission sets focused.
 4. **Audit logs not appearing**: Enable `logging.log_check_operations` and verify your `rbac_audit` log channel.
 
 ### Debugging
 
-Adjust `Aegis/config/rbac.php` to disable caches or enable check logging as needed.
+Set app-level `rbac` config overrides to tune caches or enable check logging as needed.
 
 ## Requirements
 

@@ -57,7 +57,13 @@ class AegisServiceProvider extends ServiceProvider
             RoleService::class => [
                 'class' => RoleService::class,
                 'shared' => true,
-                'arguments' => ['@' . RoleRepository::class, '@' . UserRoleRepository::class],
+                'arguments' => [
+                    '@' . RoleRepository::class,
+                    '@' . UserRoleRepository::class,
+                    // The same shared instance boot() activates on permission.manager —
+                    // privilege mutations must invalidate its decision caches.
+                    '@' . AegisPermissionProvider::class,
+                ],
             ],
             PermissionAssignmentService::class => [
                 'class' => PermissionAssignmentService::class,
@@ -68,6 +74,7 @@ class AegisServiceProvider extends ServiceProvider
                     '@' . RoleRepository::class,
                     '@' . UserRoleRepository::class,
                     '@' . RolePermissionRepository::class,
+                    '@' . AegisPermissionProvider::class,
                 ],
             ],
             AuditService::class => ['class' => AuditService::class, 'shared' => true, 'autowire' => true],

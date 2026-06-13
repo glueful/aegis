@@ -112,6 +112,12 @@ final class BootstrapAdminService
             }
         }
 
+        // The grants above wrote role_permissions directly — cached
+        // role_permission:* decisions (30 min TTL) must not outlive them.
+        if ($granted !== []) {
+            $this->provider->invalidateAllCache();
+        }
+
         if (!$this->provider->assignRole($user->uuid(), $roleSlug)) {
             throw new \RuntimeException("Failed to assign role '{$roleSlug}' to user {$user->uuid()}");
         }

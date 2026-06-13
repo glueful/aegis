@@ -26,13 +26,30 @@ class UserRoleRepository extends BaseRepository
     ];
     protected bool $hasUpdatedAt = false;
 
-    // Cache to prevent duplicate queries within a single request
-    /** @var array<string, list<UserRole>> */
-    private array $userRolesCache = [];
-
-    // Static cache to prevent duplicate queries across all instances within a single request
+    // Static cache to prevent duplicate queries across all instances within a single request.
+    // Deliberately the ONLY in-process cache layer: every repository instance (provider,
+    // services, controllers) shares it, so invalidation in one place reaches them all.
     /** @var array<string, list<UserRole>> */
     private static array $globalUserRolesCache = [];
+
+    /**
+     * Drop every cached role list for one user (all scopes). Must be called
+     * whenever the user's role assignments change, or stale roles stay
+     * effective for the rest of the process (request, worker, or queue run).
+     */
+    public static function forgetUserGlobalCache(string $userUuid): void
+    {
+        foreach (array_keys(self::$globalUserRolesCache) as $cacheKey) {
+            if (str_starts_with($cacheKey, $userUuid . '_')) {
+                unset(self::$globalUserRolesCache[$cacheKey]);
+            }
+        }
+    }
+
+    public static function flushGlobalCache(): void
+    {
+        self::$globalUserRolesCache = [];
+    }
 
     public function getTableName(): string
     {
@@ -149,7 +166,7 @@ class UserRoleRepository extends BaseRepository
     public function hasUserRole(string $userUuid, string $roleUuid, array $scope = []): bool
     {
         $query = $this->db->table($this->table)
-            ->select(['uuid'])
+            ->select($this->defaultFields)
             ->where([
                 'user_uuid' => $userUuid,
                 'role_uuid' => $roleUuid
@@ -188,18 +205,6 @@ class UserRoleRepository extends BaseRepository
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
-        // Create cache key based on user UUID and scope
-        $cacheKey = $userUuid . '_' . md5(serialize($scope));
-
-        // Check static cache first (works across all instances)
-        if (isset(self::$globalUserRolesCache[$cacheKey])) {
-            return self::$globalUserRolesCache[$cacheKey];
-        }
-
-        if (isset($this->userRolesCache[$cacheKey])) {
-            return $this->userRolesCache[$cacheKey];
-        }
-
         // Only get active (non-expired) roles
         $currentTime = $this->db->getDriver()->formatDateTime();
 
@@ -222,10 +227,6 @@ class UserRoleRepository extends BaseRepository
         }
 
         $userRoles = array_values($userRoles);
-
-        // Cache the result in both caches
-        $this->userRolesCache[$cacheKey] = $userRoles;
-        self::$globalUserRolesCache[$cacheKey] = $userRoles;
 
         return $userRoles;
     }
@@ -271,9 +272,11 @@ class UserRoleRepository extends BaseRepository
      */
     public function assignRole(string $userUuid, string $roleUuid, array $options = []): ?UserRole
     {
+        $scope = $options['scope'] ?? [];
+
         // Check if assignment already exists
-        if ($this->hasUserRole($userUuid, $roleUuid, $options['scope'] ?? [])) {
-            return $this->findUserRole($userUuid, $roleUuid);
+        if ($this->hasUserRole($userUuid, $roleUuid, $scope)) {
+            return $this->findMatchingUserRole($userUuid, $roleUuid, $scope);
         }
 
         $data = [
@@ -288,6 +291,20 @@ class UserRoleRepository extends BaseRepository
         }
 
         return $this->createUserRole($data);
+    }
+
+    /**
+     * @param array<string, mixed> $scope
+     */
+    private function findMatchingUserRole(string $userUuid, string $roleUuid, array $scope = []): ?UserRole
+    {
+        foreach ($this->findByUser($userUuid, ['role_uuid' => $roleUuid, 'active_only' => true]) as $userRole) {
+            if ($userRole->matchesScope($scope)) {
+                return $userRole;
+            }
+        }
+
+        return null;
     }
 
     public function revokeRole(string $userUuid, string $roleUuid): bool
