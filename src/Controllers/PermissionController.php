@@ -11,6 +11,9 @@ use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Http\Exceptions\Client\NotFoundException;
+use Glueful\Routing\Attributes\ApiOperation;
+use Glueful\Routing\Attributes\ApiResponse;
+use Glueful\Routing\Attributes\QueryParam;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -44,10 +47,21 @@ class PermissionController
     }
 
     /**
-     * Get all permissions
-     *
-     * @route GET /api/rbac/permissions
+     * Get all permissions.
      */
+    #[ApiOperation(
+        summary: 'List all permissions',
+        description: 'Retrieves a paginated list of permissions with optional filtering. '
+            . 'Requires the `roles.view` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[QueryParam('page', 'integer', description: 'Page number for pagination (default: 1)')]
+    #[QueryParam('per_page', 'integer', description: 'Number of items per page (default: 25)')]
+    #[QueryParam('search', description: 'Search term for permission name or slug')]
+    #[QueryParam('category', description: 'Filter by permission category')]
+    #[QueryParam('resource_type', description: 'Filter by resource type')]
+    #[ApiResponse(200, description: 'Permissions retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function index(Request $request): Response
     {
         try {
@@ -81,10 +95,17 @@ class PermissionController
     }
 
     /**
-     * Get a single permission with details
-     *
-     * @route GET /api/rbac/permissions/{uuid}
+     * Get a single permission with details.
      */
+    #[ApiOperation(
+        summary: 'Get permission details',
+        description: 'Retrieves a permission with its assigned-user count. '
+            . 'Requires the `roles.view` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission details retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Permission not found')]
     public function show(Request $request): Response
     {
         try {
@@ -109,10 +130,18 @@ class PermissionController
     }
 
     /**
-     * Create a new permission
-     *
-     * @route POST /api/rbac/permissions
+     * Create a new permission.
      */
+    #[ApiOperation(
+        summary: 'Create new permission',
+        description: 'Creates a permission. Body: `name` (required), `slug` (required), `description`, '
+            . '`category`, `resource_type`, `metadata`. Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(201, description: 'Permission created successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(409, description: 'Permission name or slug already exists')]
     public function create(Request $request): Response
     {
         try {
@@ -141,10 +170,18 @@ class PermissionController
     }
 
     /**
-     * Update an existing permission
-     *
-     * @route PUT /api/rbac/permissions/{uuid}
+     * Update an existing permission.
      */
+    #[ApiOperation(
+        summary: 'Update permission',
+        description: 'Updates a permission. Body: `name`, `description`, `category`, `metadata`. '
+            . 'Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission updated successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Permission not found')]
     public function update(Request $request): Response
     {
         try {
@@ -174,10 +211,19 @@ class PermissionController
     }
 
     /**
-     * Delete a permission
-     *
-     * @route DELETE /api/rbac/permissions/{uuid}
+     * Delete a permission.
      */
+    #[ApiOperation(
+        summary: 'Delete permission',
+        description: 'Deletes a permission, optionally forcing deletion when still assigned. '
+            . 'Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[QueryParam('force', 'boolean', description: 'Force delete even if assigned to users')]
+    #[ApiResponse(200, description: 'Permission deleted successfully')]
+    #[ApiResponse(400, description: 'Cannot delete permission (still assigned)')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Permission not found')]
     public function delete(Request $request): Response
     {
         try {
@@ -202,10 +248,18 @@ class PermissionController
     }
 
     /**
-     * Assign permission to user
-     *
-     * @route POST /api/rbac/permissions/{uuid}/assign
+     * Assign permission to user.
      */
+    #[ApiOperation(
+        summary: 'Assign permission to user',
+        description: 'Assigns the permission directly to a user. Body: `user_uuid` (required), `resource`, '
+            . '`expires_at`, `constraints`, `granted_by`. Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission assigned successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Permission or user not found')]
     public function assignToUser(Request $request): Response
     {
         try {
@@ -261,10 +315,18 @@ class PermissionController
     }
 
     /**
-     * Revoke permission from user
-     *
-     * @route DELETE /api/rbac/permissions/{uuid}/revoke
+     * Revoke permission from user.
      */
+    #[ApiOperation(
+        summary: 'Revoke permission from user',
+        description: 'Revokes the permission from a user. Body: `user_uuid` (required). '
+            . 'Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission revoked successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Permission or user not found')]
     public function revokeFromUser(Request $request): Response
     {
         try {
@@ -301,10 +363,18 @@ class PermissionController
     }
 
     /**
-     * Batch assign permissions to user
-     *
-     * @route POST /api/rbac/permissions/batch-assign
+     * Batch assign permissions to user.
      */
+    #[ApiOperation(
+        summary: 'Batch assign permissions',
+        description: 'Assigns multiple permissions to a user. Body: `user_uuid` (required), '
+            . '`permissions` (required; array of {permission, resource, options}), `options`. '
+            . 'Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Batch permission assignment completed')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function batchAssign(Request $request): Response
     {
         try {
@@ -363,10 +433,17 @@ class PermissionController
     }
 
     /**
-     * Batch revoke permissions from user
-     *
-     * @route POST /api/rbac/permissions/batch-revoke
+     * Batch revoke permissions from user.
      */
+    #[ApiOperation(
+        summary: 'Batch revoke permissions',
+        description: 'Revokes multiple permissions from a user. Body: `user_uuid` (required), '
+            . '`permission_slugs` (required). Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Batch permission revocation completed')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function batchRevoke(Request $request): Response
     {
         try {
@@ -408,10 +485,17 @@ class PermissionController
     }
 
     /**
-     * Get user's direct permissions
-     *
-     * @route GET /api/rbac/users/{user_uuid}/permissions
+     * Get user's direct permissions.
      */
+    #[ApiOperation(
+        summary: 'Get user direct permissions',
+        description: 'Retrieves all permissions directly assigned to a user (not from roles). '
+            . 'Requires the `users.view` permission.',
+        tags: ['RBAC Users'],
+    )]
+    #[QueryParam('active_only', 'boolean', description: 'Return only active permissions (default: true)')]
+    #[ApiResponse(200, description: 'User permissions retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function getUserDirectPermissions(Request $request): Response
     {
         try {
@@ -432,10 +516,17 @@ class PermissionController
     }
 
     /**
-     * Get user's effective permissions (direct + role-based)
-     *
-     * @route GET /api/rbac/users/{user_uuid}/effective-permissions
+     * Get user's effective permissions (direct + role-based).
      */
+    #[ApiOperation(
+        summary: 'Get user effective permissions',
+        description: 'Retrieves all effective permissions for a user (direct + role-based). '
+            . 'Requires the `users.view` permission.',
+        tags: ['RBAC Users'],
+    )]
+    #[QueryParam('scope', description: 'JSON-encoded scope filter')]
+    #[ApiResponse(200, description: 'User effective permissions retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function getUserEffectivePermissions(Request $request): Response
     {
         try {
@@ -456,10 +547,17 @@ class PermissionController
     }
 
     /**
-     * Check if user has specific permission
-     *
-     * @route POST /api/rbac/check-permission
+     * Check if user has specific permission.
      */
+    #[ApiOperation(
+        summary: 'Check user permission',
+        description: 'Checks whether a user has a specific permission. Body: `user_uuid` (required), '
+            . '`permission` (required), `resource`, `context`. Requires the `users.view` permission.',
+        tags: ['RBAC Validation'],
+    )]
+    #[ApiResponse(200, description: 'Permission check completed')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function checkPermission(Request $request): Response
     {
         try {
@@ -491,10 +589,16 @@ class PermissionController
     }
 
     /**
-     * Get permission statistics
-     *
-     * @route GET /api/rbac/permissions/stats
+     * Get permission statistics.
      */
+    #[ApiOperation(
+        summary: 'Get permission statistics',
+        description: 'Retrieves aggregate permission statistics (totals, system count, by-category and '
+            . 'by-resource-type breakdowns, direct assignment count). Requires the `roles.view` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission statistics retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function stats(): Response
     {
         try {
@@ -535,10 +639,15 @@ class PermissionController
     }
 
     /**
-     * Cleanup expired permissions
-     *
-     * @route POST /api/rbac/permissions/cleanup-expired
+     * Cleanup expired permissions.
      */
+    #[ApiOperation(
+        summary: 'Cleanup expired permissions',
+        description: 'Removes all expired permission assignments. Requires the `system.config` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Expired permissions cleaned up')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function cleanupExpired(): Response
     {
         try {
@@ -551,10 +660,15 @@ class PermissionController
     }
 
     /**
-     * Get permission categories
-     *
-     * @route GET /api/rbac/permissions/categories
+     * Get permission categories.
      */
+    #[ApiOperation(
+        summary: 'Get permission categories',
+        description: 'Retrieves all available permission categories. Requires the `roles.view` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Permission categories retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function getCategories(): Response
     {
         try {
@@ -567,10 +681,15 @@ class PermissionController
     }
 
     /**
-     * Get resource types
-     *
-     * @route GET /api/rbac/permissions/resource-types
+     * Get resource types.
      */
+    #[ApiOperation(
+        summary: 'Get resource types',
+        description: 'Retrieves all available resource types. Requires the `roles.view` permission.',
+        tags: ['RBAC Permissions'],
+    )]
+    #[ApiResponse(200, description: 'Resource types retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function getResourceTypes(): Response
     {
         try {

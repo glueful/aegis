@@ -10,6 +10,9 @@ use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Http\Exceptions\Client\NotFoundException;
+use Glueful\Routing\Attributes\ApiOperation;
+use Glueful\Routing\Attributes\ApiResponse;
+use Glueful\Routing\Attributes\QueryParam;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -40,10 +43,23 @@ class RoleController
     }
 
     /**
-     * Get all roles with their hierarchy
-     *
-     * @route GET /api/rbac/roles
+     * Get all roles with their hierarchy.
      */
+    #[ApiOperation(
+        summary: 'List all roles',
+        description: 'Retrieves a paginated list of roles with optional filtering, or a hierarchical '
+            . 'tree view when `tree=true`. Requires the `roles.view` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[QueryParam('page', 'integer', description: 'Page number for pagination (default: 1)')]
+    #[QueryParam('per_page', 'integer', description: 'Number of items per page (default: 25)')]
+    #[QueryParam('search', description: 'Search term for role name or slug')]
+    #[QueryParam('status', description: 'Filter by role status', enum: ['active', 'inactive'])]
+    #[QueryParam('level', 'integer', description: 'Filter by role hierarchy level')]
+    #[QueryParam('tree', 'boolean', description: 'Return roles as a hierarchical tree structure')]
+    #[QueryParam('include_deleted', 'boolean', description: 'Include soft-deleted roles')]
+    #[ApiResponse(200, description: 'Roles retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function index(Request $request): Response
     {
         try {
@@ -83,10 +99,17 @@ class RoleController
     }
 
     /**
-     * Get a single role with details
-     *
-     * @route GET /api/rbac/roles/{uuid}
+     * Get a single role with details.
      */
+    #[ApiOperation(
+        summary: 'Get role details',
+        description: 'Retrieves a role with its hierarchy chain, child roles and assigned-user count. '
+            . 'Requires the `roles.view` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role details retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
     public function show(Request $request): Response
     {
         try {
@@ -113,10 +136,18 @@ class RoleController
     }
 
     /**
-     * Create a new role
-     *
-     * @route POST /api/rbac/roles
+     * Create a new role.
      */
+    #[ApiOperation(
+        summary: 'Create new role',
+        description: 'Creates a role. Body: `name` (required), `slug` (required), `description`, '
+            . '`parent_uuid`, `status`, `metadata`. Requires the `roles.create` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(201, description: 'Role created successfully')]
+    #[ApiResponse(400, description: 'Invalid request format or validation errors')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(409, description: 'Role name or slug already exists')]
     public function create(Request $request): Response
     {
         try {
@@ -145,10 +176,18 @@ class RoleController
     }
 
     /**
-     * Update an existing role
-     *
-     * @route PUT /api/rbac/roles/{uuid}
+     * Update an existing role.
      */
+    #[ApiOperation(
+        summary: 'Update role',
+        description: 'Updates a role. Body: `name`, `description`, `parent_uuid`, `status`, `metadata`. '
+            . 'Requires the `roles.edit` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role updated successfully')]
+    #[ApiResponse(400, description: 'Invalid request format or validation errors')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
     public function update(Request $request): Response
     {
         try {
@@ -179,10 +218,19 @@ class RoleController
     }
 
     /**
-     * Delete a role
-     *
-     * @route DELETE /api/rbac/roles/{uuid}
+     * Delete a role.
      */
+    #[ApiOperation(
+        summary: 'Delete role',
+        description: 'Deletes a role, optionally forcing deletion when it has dependencies. '
+            . 'Requires the `roles.delete` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[QueryParam('force', 'boolean', description: 'Force delete even if assigned to users or has children')]
+    #[ApiResponse(200, description: 'Role deleted successfully')]
+    #[ApiResponse(400, description: 'Cannot delete role (has dependencies)')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
     public function delete(Request $request): Response
     {
         try {
@@ -207,10 +255,18 @@ class RoleController
     }
 
     /**
-     * Assign role to user
-     *
-     * @route POST /api/rbac/roles/{uuid}/assign
+     * Assign role to user.
      */
+    #[ApiOperation(
+        summary: 'Assign role to user',
+        description: 'Assigns the role to a user. Body: `user_uuid` (required), `scope`, `expires_at`, '
+            . '`assigned_by`. Requires the `roles.assign` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role assigned successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role or user not found')]
     public function assignToUser(Request $request): Response
     {
         try {
@@ -244,10 +300,18 @@ class RoleController
     }
 
     /**
-     * Revoke role from user
-     *
-     * @route DELETE /api/rbac/roles/{uuid}/revoke
+     * Revoke role from user.
      */
+    #[ApiOperation(
+        summary: 'Revoke role from user',
+        description: 'Revokes the role from a user. Body: `user_uuid` (required). '
+            . 'Requires the `roles.assign` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role revoked successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role or user not found')]
     public function revokeFromUser(Request $request): Response
     {
         try {
@@ -272,10 +336,19 @@ class RoleController
     }
 
     /**
-     * Get users assigned to a role
-     *
-     * @route GET /api/rbac/roles/{uuid}/users
+     * Get users assigned to a role.
      */
+    #[ApiOperation(
+        summary: 'Get users with role',
+        description: 'Retrieves a paginated list of users assigned to the role. '
+            . 'Requires the `roles.view` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[QueryParam('page', 'integer', description: 'Page number for pagination (default: 1)')]
+    #[QueryParam('per_page', 'integer', description: 'Number of items per page (default: 25)')]
+    #[ApiResponse(200, description: 'Role users retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
     public function getUsers(Request $request): Response
     {
         try {
@@ -302,10 +375,16 @@ class RoleController
     }
 
     /**
-     * Get role statistics
-     *
-     * @route GET /api/rbac/roles/stats
+     * Get role statistics.
      */
+    #[ApiOperation(
+        summary: 'Get role statistics',
+        description: 'Retrieves aggregate role statistics (totals, active/system counts, by-level breakdown). '
+            . 'Requires the `roles.view` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role statistics retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function stats(): Response
     {
         try {
@@ -340,10 +419,18 @@ class RoleController
     }
 
     /**
-     * Bulk role operations
-     *
-     * @route POST /api/rbac/roles/bulk
+     * Bulk role operations.
      */
+    #[ApiOperation(
+        summary: 'Bulk role operations',
+        description: 'Performs a bulk action across multiple roles. Body: `action` (required; one of '
+            . 'delete, activate, deactivate), `role_ids` (required), `force`. '
+            . 'Requires the `roles.edit` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Bulk operation completed')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
     public function bulk(Request $request): Response
     {
         try {
