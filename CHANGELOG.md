@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-06-20
+
+### Changed
+- Rerelease OpenAPI documentation with framework v1.60.0
+
 ## [1.8.0] - 2026-06-14
 
 ### Changed
