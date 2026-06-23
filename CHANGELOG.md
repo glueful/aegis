@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-06-23
+
+### Changed
+- **Default role model standardized.** `administrator` now grants full role management
+  (`roles.create`/`roles.edit`/`roles.delete`) on top of `roles.assign`, so a site admin can fully
+  run the roles/permissions surface; `system.config` stays superuser-only. The `user` role is now
+  **read-only** — it gets `content.view` only (previously also `content.create`/`content.edit`).
+
+### Removed
+- **The `manager` default role** (level 60). Apps that relied on it should assign `administrator`
+  or define their own role.
+
+> Seed changes apply to **fresh installs**; existing installs keep their already-seeded roles
+> (re-run the seed migration to adopt the new defaults).
+
 ## [1.9.0] - 2026-06-23
 
 ### Added
