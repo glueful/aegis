@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-06-23
+
+### Fixed
+- **`GET /rbac/roles/*` (and every `RoleController` route) no longer 500s.** The `RoleController`
+  service definition's `arguments` list was not updated when `RolePermissionRepository` was added as
+  constructor argument #3 in 1.9.0 — it still passed only `RoleService`, `RoleRepository`, `AuditService`,
+  so the container instantiated the controller with `AuditService` in the `$rolePermissions` slot and a
+  missing 4th argument, throwing `ArgumentCountError` ("Argument #3 ($rolePermissions)") on every role
+  route. The definition now passes `RolePermissionRepository` in position 3 and `AuditService` in
+  position 4, matching the constructor. (The existing controller test constructs `RoleController`
+  directly, so it did not exercise the container definition — hence the gap.)
+
 ## [1.10.0] - 2026-06-23
 
 ### Changed

@@ -117,6 +117,7 @@ class AegisServiceProvider extends ServiceProvider
                 'arguments' => [
                     '@' . RoleService::class,
                     '@' . RoleRepository::class,
+                    '@' . RolePermissionRepository::class,
                     '@' . AuditService::class,
                 ],
             ],
