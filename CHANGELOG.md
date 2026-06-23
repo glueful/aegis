@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-06-23
+
+### Added
+- **Role ↔ permission HTTP endpoints.** The `RolePermissionRepository` was already capable of
+  granting/revoking a role's permissions, but it wasn't exposed over the API. Four new routes on
+  `RoleController` close the gap:
+  - `GET /rbac/roles/{uuid}/permissions` — list a role's permission grants (`roles.view`).
+  - `POST /rbac/roles/{uuid}/permissions` — grant permissions additively; body `permission_uuids` (`roles.edit`).
+  - `PUT /rbac/roles/{uuid}/permissions` — replace/sync the full set; body `permission_uuids`, empty clears all (`roles.edit`).
+  - `DELETE /rbac/roles/{uuid}/permissions/{permission_uuid}` — revoke a single grant (`roles.edit`).
+
+  Each validates the role exists; the mutating routes audit the change via `logSecurityEvent`.
+
+### Changed
+- **Request bodies are now typed `RequestData` DTOs.** Every body-accepting endpoint across
+  `RoleController`, `PermissionController` and `UserRoleController` now declares a DTO parameter
+  (in `src/Http/DTOs/`) instead of reading `$request->toArray()` with inline `empty()` checks. The
+  router validates and hydrates the DTO before injection, so structural validation is declarative
+  and the OpenAPI generator reflects a typed request-body schema (and a documented `422`) for each.
+  Bonus hardening: actor/grantor fields (`assigned_by`, `granted_by`) are no longer DTO fields, so
+  they can only come from the authenticated identity — body spoofing is structurally impossible.
+
 ## [1.8.1] - 2026-06-20
 
 ### Changed
