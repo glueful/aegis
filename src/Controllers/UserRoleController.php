@@ -10,6 +10,9 @@ use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
 use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
+use Glueful\Extensions\Aegis\Http\DTOs\BulkRoleUsersData;
+use Glueful\Extensions\Aegis\Http\DTOs\CheckUserRoleData;
+use Glueful\Extensions\Aegis\Http\DTOs\UserRolesData;
 use Glueful\Routing\Attributes\ApiOperation;
 use Glueful\Routing\Attributes\ApiResponse;
 use Glueful\Routing\Attributes\QueryParam;
@@ -89,13 +92,12 @@ class UserRoleController
     #[ApiResponse(200, description: 'Roles assigned successfully')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function assignRoles(Request $request): Response
+    public function assignRoles(UserRolesData $input, Request $request): Response
     {
         try {
             $userUuid = $request->attributes->get('user_uuid', '');
-            $data = $request->toArray();
 
-            if (empty($data['role_uuids'])) {
+            if ($input->role_uuids === []) {
                 return Response::validation(
                     ['role_uuids' => ['Role UUIDs array is required']],
                     'Validation failed'
@@ -110,12 +112,12 @@ class UserRoleController
 
             $actor = $this->actorUuid($request);
             $options = [
-                'scope' => $data['scope'] ?? [],
-                'expires_at' => $data['expires_at'] ?? null,
+                'scope' => $input->scope,
+                'expires_at' => $input->expires_at,
                 'assigned_by' => $actor,
             ];
 
-            foreach ($data['role_uuids'] as $roleUuid) {
+            foreach ($input->role_uuids as $roleUuid) {
                 try {
                     $assigned = $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
                     if ($assigned) {
@@ -182,20 +184,12 @@ class UserRoleController
     #[ApiResponse(200, description: 'User roles updated successfully')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function replaceUserRoles(Request $request): Response
+    public function replaceUserRoles(UserRolesData $input, Request $request): Response
     {
         try {
             $userUuid = $request->attributes->get('user_uuid', '');
-            $data = $request->toArray();
 
-            if (!isset($data['role_uuids']) || !is_array($data['role_uuids'])) {
-                return Response::validation(
-                    ['role_uuids' => ['Role UUIDs array is required']],
-                    'Validation failed'
-                );
-            }
-
-            $scope = $data['scope'] ?? [];
+            $scope = $input->scope;
             $currentRoles = $this->roleService->getUserRoles($userUuid, $scope);
             $currentRoleUuids = array_column(array_column($currentRoles, 'role'), 'uuid');
 
@@ -208,13 +202,13 @@ class UserRoleController
             $actor = $this->actorUuid($request);
             $options = [
                 'scope' => $scope,
-                'expires_at' => $data['expires_at'] ?? null,
+                'expires_at' => $input->expires_at,
                 'assigned_by' => $actor,
             ];
 
             // Remove roles that are no longer assigned
             foreach ($currentRoleUuids as $currentRoleUuid) {
-                if (!in_array($currentRoleUuid, $data['role_uuids'])) {
+                if (!in_array($currentRoleUuid, $input->role_uuids)) {
                     try {
                         $this->roleService->revokeRoleFromUser($userUuid, $currentRoleUuid);
                         $results['removed']++;
@@ -226,7 +220,7 @@ class UserRoleController
             }
 
             // Add new roles
-            foreach ($data['role_uuids'] as $roleUuid) {
+            foreach ($input->role_uuids as $roleUuid) {
                 if (!in_array($roleUuid, $currentRoleUuids)) {
                     try {
                         $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
@@ -259,26 +253,18 @@ class UserRoleController
     #[ApiResponse(200, description: 'Role check completed')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function checkUserRole(Request $request): Response
+    public function checkUserRole(CheckUserRoleData $input, Request $request): Response
     {
         try {
             $userUuid = $request->attributes->get('user_uuid', '');
-            $data = $request->toArray();
 
-            if (empty($data['role_slug'])) {
-                return Response::validation(
-                    ['role_slug' => ['Role slug is required']],
-                    'Validation failed'
-                );
-            }
-
-            $scope = $data['scope'] ?? [];
-            $hasRole = $this->roleService->userHasRole($userUuid, $data['role_slug'], $scope);
+            $scope = $input->scope;
+            $hasRole = $this->roleService->userHasRole($userUuid, $input->role_slug, $scope);
 
             return Response::success([
                 'has_role' => $hasRole,
                 'user_uuid' => $userUuid,
-                'role_slug' => $data['role_slug'],
+                'role_slug' => $input->role_slug,
                 'scope' => $scope
             ], 'Role check completed');
         } catch (\Exception $e) {
@@ -376,13 +362,12 @@ class UserRoleController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Role not found')]
-    public function bulkAssignRoleToUsers(Request $request): Response
+    public function bulkAssignRoleToUsers(BulkRoleUsersData $input, Request $request): Response
     {
         try {
             $roleUuid = $request->attributes->get('role_uuid', '');
-            $data = $request->toArray();
 
-            if (empty($data['user_uuids'])) {
+            if ($input->user_uuids === []) {
                 return Response::validation(
                     ['user_uuids' => ['User UUIDs array is required']],
                     'Validation failed'
@@ -397,12 +382,12 @@ class UserRoleController
 
             $actor = $this->actorUuid($request);
             $options = [
-                'scope' => $data['scope'] ?? [],
-                'expires_at' => $data['expires_at'] ?? null,
+                'scope' => $input->scope,
+                'expires_at' => $input->expires_at,
                 'assigned_by' => $actor,
             ];
 
-            foreach ($data['user_uuids'] as $userUuid) {
+            foreach ($input->user_uuids as $userUuid) {
                 try {
                     $assigned = $this->roleService->assignRoleToUser($userUuid, $roleUuid, $options);
                     if ($assigned) {
@@ -440,13 +425,12 @@ class UserRoleController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Role not found')]
-    public function bulkRevokeRoleFromUsers(Request $request): Response
+    public function bulkRevokeRoleFromUsers(BulkRoleUsersData $input, Request $request): Response
     {
         try {
             $roleUuid = $request->attributes->get('role_uuid', '');
-            $data = $request->toArray();
 
-            if (empty($data['user_uuids'])) {
+            if ($input->user_uuids === []) {
                 return Response::validation(
                     ['user_uuids' => ['User UUIDs array is required']],
                     'Validation failed'
@@ -460,7 +444,7 @@ class UserRoleController
             ];
 
             $actor = $this->actorUuid($request);
-            foreach ($data['user_uuids'] as $userUuid) {
+            foreach ($input->user_uuids as $userUuid) {
                 try {
                     $revoked = $this->roleService->revokeRoleFromUser($userUuid, $roleUuid);
                     if ($revoked) {

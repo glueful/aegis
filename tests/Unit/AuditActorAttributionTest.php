@@ -7,8 +7,13 @@ namespace Glueful\Extensions\Aegis\Tests\Unit;
 use Glueful\Auth\UserIdentity;
 use Glueful\Extensions\Aegis\Controllers\PermissionController;
 use Glueful\Extensions\Aegis\Controllers\RoleController;
+use Glueful\Extensions\Aegis\Http\DTOs\AssignRoleToUserData;
+use Glueful\Extensions\Aegis\Http\DTOs\BatchAssignPermissionsData;
+use Glueful\Extensions\Aegis\Http\DTOs\BatchRevokePermissionsData;
+use Glueful\Extensions\Aegis\Http\DTOs\RoleBulkData;
 use Glueful\Extensions\Aegis\Models\Permission;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
+use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Services\AuditService;
@@ -41,22 +46,19 @@ final class AuditActorAttributionTest extends TestCase
             ->method('logRoleAssigned')
             ->with('target-user', 'role-1', self::anything(), 'real-admin');
 
-        $controller = new RoleController($roleService, $this->createMock(RoleRepository::class), $audit);
-
-        // Body tries to forge assigned_by; it must be ignored in favour of auth.user.
-        $request = Request::create(
-            '/x',
-            'POST',
-            [],
-            [],
-            [],
-            [],
-            (string) json_encode(['user_uuid' => 'target-user', 'assigned_by' => 'spoofed-attacker'])
+        $controller = new RoleController(
+            $roleService,
+            $this->createMock(RoleRepository::class),
+            $this->createMock(RolePermissionRepository::class),
+            $audit
         );
+
+        // The DTO has no `assigned_by` field, so the actor can only come from auth.user.
+        $request = Request::create('/x', 'POST');
         $request->attributes->set('uuid', 'role-1');
         $request->attributes->set('auth.user', new UserIdentity('real-admin', ['administrator']));
 
-        $response = $controller->assignToUser($request);
+        $response = $controller->assignToUser(new AssignRoleToUserData(user_uuid: 'target-user'), $request);
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -103,13 +105,14 @@ final class AuditActorAttributionTest extends TestCase
             $audit
         );
 
-        $request = $this->jsonRequest([
-            'user_uuid' => 'target-user',
-            'permissions' => [['permission' => 'posts.edit', 'resource' => 'posts:1']],
-            'options' => ['granted_by' => 'spoofed-attacker'],
-        ]);
+        // options.granted_by tries to forge the grantor; the controller overrides it with auth.user.
+        $input = new BatchAssignPermissionsData(
+            user_uuid: 'target-user',
+            permissions: [['permission' => 'posts.edit', 'resource' => 'posts:1']],
+            options: ['granted_by' => 'spoofed-attacker'],
+        );
 
-        $response = $controller->batchAssign($request);
+        $response = $controller->batchAssign($input, $this->jsonRequest([]));
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -147,12 +150,9 @@ final class AuditActorAttributionTest extends TestCase
             $audit
         );
 
-        $request = $this->jsonRequest([
-            'user_uuid' => 'target-user',
-            'permission_slugs' => ['posts.edit'],
-        ]);
+        $input = new BatchRevokePermissionsData(user_uuid: 'target-user', permission_slugs: ['posts.edit']);
 
-        $response = $controller->batchRevoke($request);
+        $response = $controller->batchRevoke($input, $this->jsonRequest([]));
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -176,8 +176,16 @@ final class AuditActorAttributionTest extends TestCase
             ->method('logRoleDeleted')
             ->with('role-1', ['uuid' => 'role-1', 'slug' => 'editor'], 'real-admin');
 
-        $controller = new RoleController($roleService, $roles, $audit);
-        $response = $controller->bulk($this->jsonRequest(['action' => 'delete', 'role_ids' => ['role-1']]));
+        $controller = new RoleController(
+            $roleService,
+            $roles,
+            $this->createMock(RolePermissionRepository::class),
+            $audit
+        );
+        $response = $controller->bulk(
+            new RoleBulkData(action: 'delete', role_ids: ['role-1']),
+            $this->jsonRequest([])
+        );
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -209,8 +217,16 @@ final class AuditActorAttributionTest extends TestCase
                 'real-admin'
             );
 
-        $controller = new RoleController($roleService, $roles, $audit);
-        $response = $controller->bulk($this->jsonRequest(['action' => 'deactivate', 'role_ids' => ['role-1']]));
+        $controller = new RoleController(
+            $roleService,
+            $roles,
+            $this->createMock(RolePermissionRepository::class),
+            $audit
+        );
+        $response = $controller->bulk(
+            new RoleBulkData(action: 'deactivate', role_ids: ['role-1']),
+            $this->jsonRequest([])
+        );
 
         self::assertSame(200, $response->getStatusCode());
     }
