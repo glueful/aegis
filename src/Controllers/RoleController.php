@@ -8,7 +8,14 @@ use Glueful\Http\Response;
 use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
+use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
+use Glueful\Extensions\Aegis\Http\DTOs\AssignRoleToUserData;
+use Glueful\Extensions\Aegis\Http\DTOs\CreateRoleData;
+use Glueful\Extensions\Aegis\Http\DTOs\RoleBulkData;
+use Glueful\Extensions\Aegis\Http\DTOs\RolePermissionsData;
+use Glueful\Extensions\Aegis\Http\DTOs\RevokeRoleFromUserData;
+use Glueful\Extensions\Aegis\Http\DTOs\UpdateRoleData;
 use Glueful\Http\Exceptions\Client\NotFoundException;
 use Glueful\Routing\Attributes\ApiOperation;
 use Glueful\Routing\Attributes\ApiResponse;
@@ -30,15 +37,18 @@ class RoleController
 
     private RoleService $roleService;
     private RoleRepository $roleRepository;
+    private RolePermissionRepository $rolePermissions;
     private AuditService $audit;
 
     public function __construct(
         RoleService $roleService,
         RoleRepository $roleRepository,
+        RolePermissionRepository $rolePermissions,
         AuditService $audit
     ) {
         $this->roleService = $roleService;
         $this->roleRepository = $roleRepository;
+        $this->rolePermissions = $rolePermissions;
         $this->audit = $audit;
     }
 
@@ -148,19 +158,10 @@ class RoleController
     #[ApiResponse(400, description: 'Invalid request format or validation errors')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(409, description: 'Role name or slug already exists')]
-    public function create(Request $request): Response
+    public function create(CreateRoleData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['name']) || empty($data['slug'])) {
-                return Response::validation(
-                    ['name' => ['Role name is required'], 'slug' => ['Role slug is required']],
-                    'Validation failed'
-                );
-            }
-
-            $role = $this->roleService->createRole($data);
+            $role = $this->roleService->createRole($input->toArray());
             if (!$role) {
                 return Response::serverError('Failed to create role');
             }
@@ -188,11 +189,11 @@ class RoleController
     #[ApiResponse(400, description: 'Invalid request format or validation errors')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Role not found')]
-    public function update(Request $request): Response
+    public function update(UpdateRoleData $input, Request $request): Response
     {
         try {
             $uuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
+            $data = $input->toArray();
 
             $oldRole = $this->roleRepository->findRecordByUuid($uuid);
 
@@ -267,29 +268,24 @@ class RoleController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Role or user not found')]
-    public function assignToUser(Request $request): Response
+    public function assignToUser(AssignRoleToUserData $input, Request $request): Response
     {
         try {
             $roleUuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid'])) {
-                return Response::validation(['user_uuid' => ['User UUID is required']], 'Validation failed');
-            }
 
             $actor = $this->actorUuid($request);
             $options = [
-                'scope' => $data['scope'] ?? [],
-                'expires_at' => $data['expires_at'] ?? null,
+                'scope' => $input->scope,
+                'expires_at' => $input->expires_at,
                 'assigned_by' => $actor,
             ];
 
-            $assigned = $this->roleService->assignRoleToUser($data['user_uuid'], $roleUuid, $options);
+            $assigned = $this->roleService->assignRoleToUser($input->user_uuid, $roleUuid, $options);
             if (!$assigned) {
                 return Response::serverError('Failed to assign role');
             }
 
-            $this->audit->logRoleAssigned($data['user_uuid'], $roleUuid, $options, $actor);
+            $this->audit->logRoleAssigned($input->user_uuid, $roleUuid, $options, $actor);
 
             return Response::success(null, 'Role assigned successfully');
         } catch (\InvalidArgumentException $e) {
@@ -312,22 +308,17 @@ class RoleController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Role or user not found')]
-    public function revokeFromUser(Request $request): Response
+    public function revokeFromUser(RevokeRoleFromUserData $input, Request $request): Response
     {
         try {
             $roleUuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
 
-            if (empty($data['user_uuid'])) {
-                return Response::validation(['user_uuid' => ['User UUID is required']], 'Validation failed');
-            }
-
-            $revoked = $this->roleService->revokeRoleFromUser($data['user_uuid'], $roleUuid);
+            $revoked = $this->roleService->revokeRoleFromUser($input->user_uuid, $roleUuid);
             if (!$revoked) {
                 return Response::serverError('Failed to revoke role');
             }
 
-            $this->audit->logRoleRevoked($data['user_uuid'], $roleUuid, $this->actorUuid($request));
+            $this->audit->logRoleRevoked($input->user_uuid, $roleUuid, $this->actorUuid($request));
 
             return Response::success(null, 'Role revoked successfully');
         } catch (\Exception $e) {
@@ -369,6 +360,163 @@ class RoleController
             return Response::successWithMeta($usersData, $meta, 'Role users retrieved successfully');
         } catch (NotFoundException $e) {
             return Response::notFound($e->getMessage());
+        } catch (\Exception $e) {
+            return Response::serverError($e->getMessage());
+        }
+    }
+
+    /**
+     * List the permissions granted to a role.
+     */
+    #[ApiOperation(
+        summary: 'List role permissions',
+        description: 'Retrieves the permission grants for a role. Requires the `roles.view` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role permissions retrieved successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
+    public function getPermissions(Request $request): Response
+    {
+        try {
+            $uuid = $request->attributes->get('uuid', '');
+            if (!$this->roleRepository->findRecordByUuid($uuid)) {
+                return Response::notFound('Role not found.');
+            }
+
+            $permissions = $this->rolePermissions->getRolePermissions($uuid);
+
+            return Response::success(
+                ['permissions' => $permissions],
+                'Role permissions retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            return Response::serverError($e->getMessage());
+        }
+    }
+
+    /**
+     * Assign permissions to a role (additive).
+     */
+    #[ApiOperation(
+        summary: 'Assign permissions to role',
+        description: 'Grants one or more permissions to a role without removing existing grants. '
+            . 'Body: `permission_uuids` (required array). Requires the `roles.edit` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Permissions assigned to role successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
+    public function assignPermissions(RolePermissionsData $input, Request $request): Response
+    {
+        try {
+            $uuid = $request->attributes->get('uuid', '');
+
+            if ($input->permission_uuids === []) {
+                return Response::validation(
+                    ['permission_uuids' => ['At least one permission UUID is required']],
+                    'Validation failed'
+                );
+            }
+            if (!$this->roleRepository->findRecordByUuid($uuid)) {
+                return Response::notFound('Role not found.');
+            }
+
+            $results = $this->rolePermissions->batchAssignPermissions($uuid, $input->permission_uuids);
+
+            $this->audit->logSecurityEvent(
+                'role.permissions.assigned',
+                ['role_uuid' => $uuid, 'permission_uuids' => $input->permission_uuids],
+                $this->actorUuid($request)
+            );
+
+            return Response::success($results, 'Permissions assigned to role successfully');
+        } catch (\InvalidArgumentException $e) {
+            return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');
+        } catch (\Exception $e) {
+            return Response::serverError($e->getMessage());
+        }
+    }
+
+    /**
+     * Replace (sync) the full set of a role's permissions.
+     */
+    #[ApiOperation(
+        summary: 'Replace role permissions',
+        description: 'Replaces the role\'s permissions with exactly the supplied set (grants the '
+            . 'missing ones, revokes the rest). Body: `permission_uuids` (required array; empty clears '
+            . 'all). Requires the `roles.edit` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Role permissions updated successfully')]
+    #[ApiResponse(400, description: 'Invalid request format')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
+    public function replacePermissions(RolePermissionsData $input, Request $request): Response
+    {
+        try {
+            $uuid = $request->attributes->get('uuid', '');
+
+            if (!$this->roleRepository->findRecordByUuid($uuid)) {
+                return Response::notFound('Role not found.');
+            }
+
+            $ok = $this->rolePermissions->replaceRolePermissions($uuid, $input->permission_uuids);
+            if (!$ok) {
+                return Response::serverError('Failed to update role permissions');
+            }
+
+            $this->audit->logSecurityEvent(
+                'role.permissions.replaced',
+                ['role_uuid' => $uuid, 'permission_uuids' => $input->permission_uuids],
+                $this->actorUuid($request)
+            );
+
+            return Response::success(
+                ['permissions' => $this->rolePermissions->getRolePermissions($uuid)],
+                'Role permissions updated successfully'
+            );
+        } catch (\InvalidArgumentException $e) {
+            return Response::validation(['error' => [$e->getMessage()]], 'Validation failed');
+        } catch (\Exception $e) {
+            return Response::serverError($e->getMessage());
+        }
+    }
+
+    /**
+     * Revoke a single permission from a role.
+     */
+    #[ApiOperation(
+        summary: 'Revoke permission from role',
+        description: 'Removes a single permission grant from a role. Requires the `roles.edit` permission.',
+        tags: ['RBAC Roles'],
+    )]
+    #[ApiResponse(200, description: 'Permission revoked from role successfully')]
+    #[ApiResponse(403, description: 'Permission denied')]
+    #[ApiResponse(404, description: 'Role not found')]
+    public function revokePermission(Request $request): Response
+    {
+        try {
+            $uuid = $request->attributes->get('uuid', '');
+            $permissionUuid = $request->attributes->get('permission_uuid', '');
+
+            if (!$this->roleRepository->findRecordByUuid($uuid)) {
+                return Response::notFound('Role not found.');
+            }
+
+            $revoked = $this->rolePermissions->revokePermissionFromRole($uuid, $permissionUuid);
+            if (!$revoked) {
+                return Response::serverError('Failed to revoke permission from role');
+            }
+
+            $this->audit->logSecurityEvent(
+                'role.permissions.revoked',
+                ['role_uuid' => $uuid, 'permission_uuid' => $permissionUuid],
+                $this->actorUuid($request)
+            );
+
+            return Response::success(null, 'Permission revoked from role successfully');
         } catch (\Exception $e) {
             return Response::serverError($e->getMessage());
         }
@@ -431,14 +579,12 @@ class RoleController
     #[ApiResponse(200, description: 'Bulk operation completed')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function bulk(Request $request): Response
+    public function bulk(RoleBulkData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['action']) || empty($data['role_ids'])) {
+            if ($input->role_ids === []) {
                 return Response::validation(
-                    ['action' => ['Action is required'], 'role_ids' => ['Role IDs are required']],
+                    ['role_ids' => ['Role IDs are required']],
                     'Validation failed'
                 );
             }
@@ -450,7 +596,7 @@ class RoleController
             ];
 
             $actor = $this->actorUuid($request);
-            foreach ($data['role_ids'] as $roleUuid) {
+            foreach ($input->role_ids as $roleUuid) {
                 try {
                     $role = $this->roleRepository->findRecordByUuid($roleUuid);
                     if (!$role) {
@@ -459,9 +605,9 @@ class RoleController
                         continue;
                     }
 
-                    switch ($data['action']) {
+                    switch ($input->action) {
                         case 'delete':
-                            $force = $data['force'] ?? false;
+                            $force = $input->force;
                             if (!$this->roleService->deleteRole($roleUuid, $force)) {
                                 throw new \RuntimeException('Delete failed');
                             }

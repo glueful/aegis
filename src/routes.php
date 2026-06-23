@@ -45,6 +45,11 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
         $router->get('/{uuid}/users', [RoleController::class, 'getUsers'])->middleware('aegis_permission:roles.view');
         $router->post('/{role_uuid}/assign-users', [UserRoleController::class, 'bulkAssignRoleToUsers'])->middleware('aegis_permission:roles.assign');
         $router->delete('/{role_uuid}/revoke-users', [UserRoleController::class, 'bulkRevokeRoleFromUsers'])->middleware('aegis_permission:roles.assign');
+        // Role ↔ permission grants.
+        $router->get('/{uuid}/permissions', [RoleController::class, 'getPermissions'])->middleware('aegis_permission:roles.view');
+        $router->post('/{uuid}/permissions', [RoleController::class, 'assignPermissions'])->middleware('aegis_permission:roles.edit');
+        $router->put('/{uuid}/permissions', [RoleController::class, 'replacePermissions'])->middleware('aegis_permission:roles.edit');
+        $router->delete('/{uuid}/permissions/{permission_uuid}', [RoleController::class, 'revokePermission'])->middleware('aegis_permission:roles.edit');
     });
 
     // Permission Management Routes

@@ -10,6 +10,13 @@ use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
+use Glueful\Extensions\Aegis\Http\DTOs\AssignPermissionToUserData;
+use Glueful\Extensions\Aegis\Http\DTOs\BatchAssignPermissionsData;
+use Glueful\Extensions\Aegis\Http\DTOs\BatchRevokePermissionsData;
+use Glueful\Extensions\Aegis\Http\DTOs\CheckPermissionData;
+use Glueful\Extensions\Aegis\Http\DTOs\CreatePermissionData;
+use Glueful\Extensions\Aegis\Http\DTOs\RevokePermissionFromUserData;
+use Glueful\Extensions\Aegis\Http\DTOs\UpdatePermissionData;
 use Glueful\Http\Exceptions\Client\NotFoundException;
 use Glueful\Routing\Attributes\ApiOperation;
 use Glueful\Routing\Attributes\ApiResponse;
@@ -142,19 +149,10 @@ class PermissionController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(409, description: 'Permission name or slug already exists')]
-    public function create(Request $request): Response
+    public function create(CreatePermissionData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['name']) || empty($data['slug'])) {
-                return Response::validation(
-                    ['name' => ['Permission name is required'], 'slug' => ['Permission slug is required']],
-                    'Validation failed'
-                );
-            }
-
-            $permission = $this->permissionService->createPermission($data);
+            $permission = $this->permissionService->createPermission($input->toArray());
             if (!$permission) {
                 return Response::serverError('Failed to create permission');
             }
@@ -182,11 +180,11 @@ class PermissionController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Permission not found')]
-    public function update(Request $request): Response
+    public function update(UpdatePermissionData $input, Request $request): Response
     {
         try {
             $uuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
+            $data = $input->toArray();
 
             $oldPermission = $this->permissionRepository->findRecordByUuid($uuid);
 
@@ -260,18 +258,10 @@ class PermissionController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Permission or user not found')]
-    public function assignToUser(Request $request): Response
+    public function assignToUser(AssignPermissionToUserData $input, Request $request): Response
     {
         try {
             $permissionUuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid'])) {
-                return Response::validation(
-                    ['user_uuid' => ['User UUID is required']],
-                    'Validation failed'
-                );
-            }
 
             $permission = $this->permissionRepository->findRecordByUuid($permissionUuid);
             if (!$permission) {
@@ -279,15 +269,15 @@ class PermissionController
             }
 
             $actor = $this->actorUuid($request);
-            $resource = $data['resource'] ?? '*';
+            $resource = $input->resource;
             $options = [
                 'granted_by' => $actor,
-                'expires_at' => $data['expires_at'] ?? null,
-                'constraints' => $data['constraints'] ?? null
+                'expires_at' => $input->expires_at,
+                'constraints' => $input->constraints
             ];
 
             $assigned = $this->permissionService->assignPermissionToUser(
-                $data['user_uuid'],
+                $input->user_uuid,
                 $permission['slug'],
                 $resource,
                 $options
@@ -298,7 +288,7 @@ class PermissionController
             }
 
             $this->audit->logPermissionAssigned(
-                $data['user_uuid'],
+                $input->user_uuid,
                 $permissionUuid,
                 array_merge($options, ['resource' => $resource]),
                 $actor
@@ -327,18 +317,10 @@ class PermissionController
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
     #[ApiResponse(404, description: 'Permission or user not found')]
-    public function revokeFromUser(Request $request): Response
+    public function revokeFromUser(RevokePermissionFromUserData $input, Request $request): Response
     {
         try {
             $permissionUuid = $request->attributes->get('uuid', '');
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid'])) {
-                return Response::validation(
-                    ['user_uuid' => ['User UUID is required']],
-                    'Validation failed'
-                );
-            }
 
             $permission = $this->permissionRepository->findRecordByUuid($permissionUuid);
             if (!$permission) {
@@ -346,12 +328,12 @@ class PermissionController
             }
 
             $revoked = $this->permissionService->revokePermissionFromUser(
-                $data['user_uuid'],
+                $input->user_uuid,
                 $permission['slug']
             );
 
             if ($revoked) {
-                $this->audit->logPermissionRevoked($data['user_uuid'], $permissionUuid, $this->actorUuid($request));
+                $this->audit->logPermissionRevoked($input->user_uuid, $permissionUuid, $this->actorUuid($request));
             }
 
             return Response::success(['revoked' => $revoked], 'Permission revocation processed');
@@ -375,22 +357,20 @@ class PermissionController
     #[ApiResponse(200, description: 'Batch permission assignment completed')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function batchAssign(Request $request): Response
+    public function batchAssign(BatchAssignPermissionsData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid']) || empty($data['permissions'])) {
+            if ($input->permissions === []) {
                 return Response::validation(
-                    ['user_uuid' => ['User UUID is required'], 'permissions' => ['Permissions array is required']],
+                    ['permissions' => ['Permissions array is required']],
                     'Validation failed'
                 );
             }
 
             $actor = $this->actorUuid($request);
-            $globalOptions = array_merge($data['options'] ?? [], ['granted_by' => $actor]);
+            $globalOptions = array_merge($input->options, ['granted_by' => $actor]);
             $auditDataBySlug = [];
-            foreach ($data['permissions'] as $permissionData) {
+            foreach ($input->permissions as $permissionData) {
                 $slug = $permissionData['permission'] ?? '';
                 if ($slug === '') {
                     continue;
@@ -403,8 +383,8 @@ class PermissionController
             }
 
             $results = $this->permissionService->batchAssignPermissions(
-                $data['user_uuid'],
-                $data['permissions'],
+                $input->user_uuid,
+                $input->permissions,
                 $globalOptions
             );
 
@@ -419,7 +399,7 @@ class PermissionController
                 }
 
                 $this->audit->logPermissionAssigned(
-                    $data['user_uuid'],
+                    $input->user_uuid,
                     $permission->getUuid(),
                     $auditDataBySlug[$result['permission']] ?? ['resource' => $result['resource'] ?? '*'],
                     $actor
@@ -444,24 +424,19 @@ class PermissionController
     #[ApiResponse(200, description: 'Batch permission revocation completed')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function batchRevoke(Request $request): Response
+    public function batchRevoke(BatchRevokePermissionsData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid']) || empty($data['permission_slugs'])) {
+            if ($input->permission_slugs === []) {
                 return Response::validation(
-                    [
-                        'user_uuid' => ['User UUID is required'],
-                        'permission_slugs' => ['Permission slugs array is required']
-                    ],
+                    ['permission_slugs' => ['Permission slugs array is required']],
                     'Validation failed'
                 );
             }
 
             $results = $this->permissionService->batchRevokePermissions(
-                $data['user_uuid'],
-                $data['permission_slugs']
+                $input->user_uuid,
+                $input->permission_slugs
             );
 
             $actor = $this->actorUuid($request);
@@ -475,7 +450,7 @@ class PermissionController
                     continue;
                 }
 
-                $this->audit->logPermissionRevoked($data['user_uuid'], $permission->getUuid(), $actor);
+                $this->audit->logPermissionRevoked($input->user_uuid, $permission->getUuid(), $actor);
             }
 
             return Response::success($results, 'Batch permission revocation completed');
@@ -558,30 +533,21 @@ class PermissionController
     #[ApiResponse(200, description: 'Permission check completed')]
     #[ApiResponse(400, description: 'Invalid request format')]
     #[ApiResponse(403, description: 'Permission denied')]
-    public function checkPermission(Request $request): Response
+    public function checkPermission(CheckPermissionData $input, Request $request): Response
     {
         try {
-            $data = $request->toArray();
-
-            if (empty($data['user_uuid']) || empty($data['permission'])) {
-                return Response::validation(
-                    ['user_uuid' => ['User UUID is required'], 'permission' => ['Permission is required']],
-                    'Validation failed'
-                );
-            }
-
             $hasPermission = $this->permissionService->userHasPermission(
-                $data['user_uuid'],
-                $data['permission'],
-                $data['resource'] ?? '*',
-                $data['context'] ?? []
+                $input->user_uuid,
+                $input->permission,
+                $input->resource,
+                $input->context
             );
 
             return Response::success([
                 'has_permission' => $hasPermission,
-                'user_uuid' => $data['user_uuid'],
-                'permission' => $data['permission'],
-                'resource' => $data['resource'] ?? '*'
+                'user_uuid' => $input->user_uuid,
+                'permission' => $input->permission,
+                'resource' => $input->resource
             ], 'Permission check completed');
         } catch (\Exception $e) {
             return Response::serverError($e->getMessage());
