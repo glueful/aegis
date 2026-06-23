@@ -62,14 +62,6 @@ class SeedDefaultRoles implements MigrationInterface
                 'is_system' => true,
                 'status' => 'active'
             ],
-            'manager' => [
-                'name' => 'Manager',
-                'slug' => 'manager',
-                'description' => 'User manager with limited admin access',
-                'level' => 60,
-                'is_system' => true,
-                'status' => 'active'
-            ],
             'user' => [
                 'name' => 'User',
                 'slug' => 'user',
@@ -253,21 +245,16 @@ class SeedDefaultRoles implements MigrationInterface
                 'rol_edit', 'rol_delete', 'rol_assign', 'cnt_view',
                 'cnt_create', 'cnt_edit', 'cnt_delete'
             ],
-            // Administrator gets most permissions except system config
+            // Administrator gets full role/user/content management, but not system config
+            // (catalog-level changes stay superuser-only).
             'administrator' => [
-                'sys_access', 'usr_view', 'usr_create', 'usr_edit',
-                'usr_delete', 'rol_view', 'rol_assign', 'cnt_view',
-                'cnt_create', 'cnt_edit', 'cnt_delete'
+                'sys_access', 'usr_view', 'usr_create', 'usr_edit', 'usr_delete',
+                'rol_view', 'rol_create', 'rol_edit', 'rol_delete', 'rol_assign',
+                'cnt_view', 'cnt_create', 'cnt_edit', 'cnt_delete'
             ],
-            // Manager gets user and content management
-            'manager' => [
-                'sys_access', 'usr_view', 'usr_edit', 'rol_view',
-                'rol_assign', 'cnt_view', 'cnt_create', 'cnt_edit',
-                'cnt_delete'
-            ],
-            // User gets basic content access
+            // User is basic: read-only content access.
             'user' => [
-                'cnt_view', 'cnt_create', 'cnt_edit'
+                'cnt_view'
             ]
         ];
 
