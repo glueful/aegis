@@ -9,6 +9,7 @@ use Glueful\Database\Migrations\MigrationPriority;
 use Glueful\Extensions\ServiceProvider;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\IdentityClaimsProvider;
+use Glueful\Extensions\Aegis\UserRoleEnricher;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
@@ -98,6 +99,16 @@ class AegisServiceProvider extends ServiceProvider
                 'shared' => true,
                 'arguments' => ['@' . UserRoleRepository::class],
                 'tags' => ['identity.claims_provider'],
+            ],
+
+            // Attaches each user's roles to user RECORDS the identity store returns (the /users list,
+            // /users/{uuid}, /me). Tagged 'users.record_enricher' so glueful/users collects it without
+            // depending on Aegis — the read-side symmetric of the claims provider above.
+            UserRoleEnricher::class => [
+                'class' => UserRoleEnricher::class,
+                'shared' => true,
+                'arguments' => ['@' . UserRoleRepository::class],
+                'tags' => ['users.record_enricher'],
             ],
 
             // Controllers

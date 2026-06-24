@@ -14,7 +14,7 @@ namespace Glueful\Extensions\Aegis\Models;
  * - Permission overrides (grant or deny)
  * - Assignment tracking and audit trail
  */
-class UserPermission
+class UserPermission implements \JsonSerializable
 {
     private string $uuid;
     private string $userUuid;
@@ -261,6 +261,16 @@ class UserPermission
             'expires_at' => $this->expiresAt,
             'created_at' => $this->createdAt
         ];
+    }
+
+    /**
+     * Serialize for JSON responses (private props would otherwise encode to `{}`).
+     *
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**

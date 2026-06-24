@@ -9,6 +9,7 @@ use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Extensions\Aegis\Repositories\RolePermissionRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ReadsRouteParams;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Extensions\Aegis\Http\DTOs\AssignRoleToUserData;
 use Glueful\Extensions\Aegis\Http\DTOs\CreateRoleData;
@@ -33,6 +34,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class RoleController
 {
+    use ReadsRouteParams;
     use ResolvesActor;
 
     private RoleService $roleService;
@@ -123,7 +125,7 @@ class RoleController
     public function show(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
 
             $role = $this->roleRepository->findRecordByUuid($uuid);
             if (!$role) {
@@ -192,7 +194,7 @@ class RoleController
     public function update(UpdateRoleData $input, Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             $data = $input->toArray();
 
             $oldRole = $this->roleRepository->findRecordByUuid($uuid);
@@ -235,7 +237,7 @@ class RoleController
     public function delete(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
             $role = $this->roleRepository->findRecordByUuid($uuid);
@@ -271,7 +273,7 @@ class RoleController
     public function assignToUser(AssignRoleToUserData $input, Request $request): Response
     {
         try {
-            $roleUuid = $request->attributes->get('uuid', '');
+            $roleUuid = $this->routeParam($request, 'uuid');
 
             $actor = $this->actorUuid($request);
             $options = [
@@ -311,7 +313,7 @@ class RoleController
     public function revokeFromUser(RevokeRoleFromUserData $input, Request $request): Response
     {
         try {
-            $roleUuid = $request->attributes->get('uuid', '');
+            $roleUuid = $this->routeParam($request, 'uuid');
 
             $revoked = $this->roleService->revokeRoleFromUser($input->user_uuid, $roleUuid);
             if (!$revoked) {
@@ -343,7 +345,7 @@ class RoleController
     public function getUsers(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             $page = (int) $request->query->get('page', 1);
             $perPage = (int) $request->query->get('per_page', 25);
 
@@ -379,7 +381,7 @@ class RoleController
     public function getPermissions(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             if (!$this->roleRepository->findRecordByUuid($uuid)) {
                 return Response::notFound('Role not found.');
             }
@@ -411,7 +413,7 @@ class RoleController
     public function assignPermissions(RolePermissionsData $input, Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
 
             if ($input->permission_uuids === []) {
                 return Response::validation(
@@ -456,7 +458,7 @@ class RoleController
     public function replacePermissions(RolePermissionsData $input, Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
 
             if (!$this->roleRepository->findRecordByUuid($uuid)) {
                 return Response::notFound('Role not found.');
@@ -498,8 +500,8 @@ class RoleController
     public function revokePermission(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
-            $permissionUuid = $request->attributes->get('permission_uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
+            $permissionUuid = $this->routeParam($request, 'permission_uuid');
 
             if (!$this->roleRepository->findRecordByUuid($uuid)) {
                 return Response::notFound('Role not found.');

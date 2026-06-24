@@ -63,10 +63,13 @@ $router->group(['prefix' => '/rbac', 'middleware' => ['auth']], function(Router 
         $router->post('/', [PermissionController::class, 'create'])->middleware('aegis_permission:system.config');
         $router->put('/{uuid}', [PermissionController::class, 'update'])->middleware('aegis_permission:system.config');
         $router->delete('/{uuid}', [PermissionController::class, 'delete'])->middleware('aegis_permission:system.config');
-        $router->post('/{uuid}/assign', [PermissionController::class, 'assignToUser'])->middleware('aegis_permission:system.config');
-        $router->delete('/{uuid}/revoke', [PermissionController::class, 'revokeFromUser'])->middleware('aegis_permission:system.config');
-        $router->post('/batch-assign', [PermissionController::class, 'batchAssign'])->middleware('aegis_permission:system.config');
-        $router->post('/batch-revoke', [PermissionController::class, 'batchRevoke'])->middleware('aegis_permission:system.config');
+        // Assigning permissions DIRECTLY to a user is the user-side analog of editing a role's
+        // permissions (gated roles.edit), so it is gated `users.edit` — administrators hold it.
+        // Defining permissions (create/update/delete above) stays superuser-only (system.config).
+        $router->post('/{uuid}/assign', [PermissionController::class, 'assignToUser'])->middleware('aegis_permission:users.edit');
+        $router->delete('/{uuid}/revoke', [PermissionController::class, 'revokeFromUser'])->middleware('aegis_permission:users.edit');
+        $router->post('/batch-assign', [PermissionController::class, 'batchAssign'])->middleware('aegis_permission:users.edit');
+        $router->post('/batch-revoke', [PermissionController::class, 'batchRevoke'])->middleware('aegis_permission:users.edit');
     });
 
     // User-specific RBAC Routes

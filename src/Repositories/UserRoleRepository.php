@@ -133,6 +133,45 @@ class UserRoleRepository extends BaseRepository
     }
 
     /**
+     * Batch-load each user's active role {uuid,name,slug} list in ONE query (no N+1). Excludes
+     * soft-deleted roles and expired assignments. Keyed by user_uuid; users with no roles are absent.
+     *
+     * @param list<string> $userUuids
+     * @return array<string, list<array{uuid: string, name: string, slug: string}>>
+     */
+    public function getRolesForUsers(array $userUuids): array
+    {
+        $out = [];
+        if ($userUuids === []) {
+            return $out;
+        }
+        $now = $this->db->getDriver()->formatDateTime();
+        $rows = $this->db->table('user_roles')
+            ->select([
+                'user_roles.user_uuid AS user_uuid',
+                'roles.uuid AS role_uuid',
+                'roles.name AS role_name',
+                'roles.slug AS role_slug',
+            ])
+            ->join('roles', 'roles.uuid', '=', 'user_roles.role_uuid')
+            ->whereIn('user_roles.user_uuid', $userUuids)
+            ->whereNull('roles.deleted_at')
+            ->where(function ($q) use ($now) {
+                $q->where('user_roles.expires_at', '>=', $now)
+                  ->orWhereNull('user_roles.expires_at');
+            })
+            ->get();
+        foreach ($rows as $r) {
+            $out[(string) $r['user_uuid']][] = [
+                'uuid' => (string) $r['role_uuid'],
+                'name' => (string) $r['role_name'],
+                'slug' => (string) $r['role_slug'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * @return list<UserRole>
      */
     public function findByRole(string $roleUuid): array

@@ -9,6 +9,7 @@ use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
 use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\UserPermissionRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ReadsRouteParams;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Extensions\Aegis\Http\DTOs\AssignPermissionToUserData;
 use Glueful\Extensions\Aegis\Http\DTOs\BatchAssignPermissionsData;
@@ -34,6 +35,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class PermissionController
 {
+    use ReadsRouteParams;
     use ResolvesActor;
 
     private PermissionAssignmentService $permissionService;
@@ -116,7 +118,7 @@ class PermissionController
     public function show(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
 
             $permission = $this->permissionRepository->findRecordByUuid($uuid);
             if (!$permission) {
@@ -183,7 +185,7 @@ class PermissionController
     public function update(UpdatePermissionData $input, Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             $data = $input->toArray();
 
             $oldPermission = $this->permissionRepository->findRecordByUuid($uuid);
@@ -225,7 +227,7 @@ class PermissionController
     public function delete(Request $request): Response
     {
         try {
-            $uuid = $request->attributes->get('uuid', '');
+            $uuid = $this->routeParam($request, 'uuid');
             $force = filter_var($request->query->get('force', false), FILTER_VALIDATE_BOOLEAN);
 
             $permission = $this->permissionRepository->findRecordByUuid($uuid);
@@ -261,7 +263,7 @@ class PermissionController
     public function assignToUser(AssignPermissionToUserData $input, Request $request): Response
     {
         try {
-            $permissionUuid = $request->attributes->get('uuid', '');
+            $permissionUuid = $this->routeParam($request, 'uuid');
 
             $permission = $this->permissionRepository->findRecordByUuid($permissionUuid);
             if (!$permission) {
@@ -320,7 +322,7 @@ class PermissionController
     public function revokeFromUser(RevokePermissionFromUserData $input, Request $request): Response
     {
         try {
-            $permissionUuid = $request->attributes->get('uuid', '');
+            $permissionUuid = $this->routeParam($request, 'uuid');
 
             $permission = $this->permissionRepository->findRecordByUuid($permissionUuid);
             if (!$permission) {
@@ -474,7 +476,7 @@ class PermissionController
     public function getUserDirectPermissions(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
             $activeOnly = filter_var($request->query->get('active_only', true), FILTER_VALIDATE_BOOLEAN);
 
             $filters = [];
@@ -505,7 +507,7 @@ class PermissionController
     public function getUserEffectivePermissions(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];

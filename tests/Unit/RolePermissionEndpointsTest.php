@@ -130,10 +130,12 @@ final class RolePermissionEndpointsTest extends TestCase
     private function request(string $roleUuid, array $body = [], string $permissionUuid = ''): Request
     {
         $request = Request::create('/x', 'POST', [], [], [], [], (string) json_encode($body));
-        $request->attributes->set('uuid', $roleUuid);
+        // The framework router exposes matched params under `_route_params` (read via routeParam()).
+        $params = ['uuid' => $roleUuid];
         if ($permissionUuid !== '') {
-            $request->attributes->set('permission_uuid', $permissionUuid);
+            $params['permission_uuid'] = $permissionUuid;
         }
+        $request->attributes->set('_route_params', $params);
         $request->attributes->set('auth.user', new UserIdentity('real-admin', ['administrator']));
 
         return $request;
