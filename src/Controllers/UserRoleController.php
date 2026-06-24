@@ -9,6 +9,7 @@ use Glueful\Extensions\Aegis\Services\RoleService;
 use Glueful\Extensions\Aegis\Services\PermissionAssignmentService;
 use Glueful\Extensions\Aegis\Services\AuditService;
 use Glueful\Extensions\Aegis\Repositories\UserRoleRepository;
+use Glueful\Extensions\Aegis\Http\Concerns\ReadsRouteParams;
 use Glueful\Extensions\Aegis\Http\Concerns\ResolvesActor;
 use Glueful\Extensions\Aegis\Http\DTOs\BulkRoleUsersData;
 use Glueful\Extensions\Aegis\Http\DTOs\CheckUserRoleData;
@@ -29,6 +30,7 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class UserRoleController
 {
+    use ReadsRouteParams;
     use ResolvesActor;
 
     private RoleService $roleService;
@@ -64,7 +66,7 @@ class UserRoleController
     public function getUserRoles(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];
@@ -95,7 +97,7 @@ class UserRoleController
     public function assignRoles(UserRolesData $input, Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
 
             if ($input->role_uuids === []) {
                 return Response::validation(
@@ -156,8 +158,8 @@ class UserRoleController
     public function revokeRole(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
-            $roleUuid = $request->attributes->get('role_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
+            $roleUuid = $this->routeParam($request, 'role_uuid');
 
             $revoked = $this->roleService->revokeRoleFromUser($userUuid, $roleUuid);
             if (!$revoked) {
@@ -187,7 +189,7 @@ class UserRoleController
     public function replaceUserRoles(UserRolesData $input, Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
 
             $scope = $input->scope;
             $currentRoles = $this->roleService->getUserRoles($userUuid, $scope);
@@ -256,7 +258,7 @@ class UserRoleController
     public function checkUserRole(CheckUserRoleData $input, Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
 
             $scope = $input->scope;
             $hasRole = $this->roleService->userHasRole($userUuid, $input->role_slug, $scope);
@@ -287,7 +289,7 @@ class UserRoleController
     public function getUserAccessOverview(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
             $scope = $request->query->get('scope', '');
             if (is_string($scope) && !empty($scope)) {
                 $scope = json_decode($scope, true) ?? [];
@@ -328,7 +330,7 @@ class UserRoleController
     public function getUserRoleHistory(Request $request): Response
     {
         try {
-            $userUuid = $request->attributes->get('user_uuid', '');
+            $userUuid = $this->routeParam($request, 'user_uuid');
             $page = (int) $request->query->get('page', 1);
             $perPage = (int) $request->query->get('per_page', 25);
             $includeDeleted = filter_var($request->query->get('include_deleted', true), FILTER_VALIDATE_BOOLEAN);
@@ -365,7 +367,7 @@ class UserRoleController
     public function bulkAssignRoleToUsers(BulkRoleUsersData $input, Request $request): Response
     {
         try {
-            $roleUuid = $request->attributes->get('role_uuid', '');
+            $roleUuid = $this->routeParam($request, 'role_uuid');
 
             if ($input->user_uuids === []) {
                 return Response::validation(
@@ -428,7 +430,7 @@ class UserRoleController
     public function bulkRevokeRoleFromUsers(BulkRoleUsersData $input, Request $request): Response
     {
         try {
-            $roleUuid = $request->attributes->get('role_uuid', '');
+            $roleUuid = $this->routeParam($request, 'role_uuid');
 
             if ($input->user_uuids === []) {
                 return Response::validation(

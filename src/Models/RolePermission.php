@@ -10,7 +10,7 @@ namespace Glueful\Extensions\Aegis\Models;
  * Represents a permission assignment to a role in the RBAC system.
  * Manages the many-to-many relationship between roles and permissions.
  */
-class RolePermission
+class RolePermission implements \JsonSerializable
 {
     private int $id;
     private string $uuid;
@@ -246,6 +246,18 @@ class RolePermission
             'is_expired' => $this->isExpired(),
             'is_active' => $this->isActive()
         ];
+    }
+
+    /**
+     * Serialize for JSON responses. Without this, the model's private properties would encode to an
+     * empty object (`{}`), so a `GET /rbac/roles/{uuid}/permissions` response would carry no
+     * `permission_uuid` for clients to read.
+     *
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**

@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.10.1] - 2026-06-23
+## [1.10.2] - 2026-06-24
+
+### Fixed
+- **Every single-resource RBAC route (`/{uuid}`, `/{user_uuid}`, …) no longer 404s.** The controllers
+  read the matched route id via `$request->attributes->get('uuid')`, but the framework router stores
+  matched params under the `_route_params` attribute (and injects them as handler arguments) — it does
+  not set a top-level `uuid` attribute. The id was therefore always empty, so role show/update/delete,
+  permission assign/replace/revoke, role-permission listing, and the user-role operations all returned
+  "not found". A new `ReadsRouteParams` trait reads from `_route_params`; all three controllers now use it.
+- **`GET /rbac/roles/{uuid}/permissions` now returns each grant's fields.** `RolePermission` had only
+  private properties and did not implement `JsonSerializable`, so it `json_encode`d to `{}` — the
+  response carried no `permission_uuid`. It now implements `JsonSerializable` (`jsonSerialize()` →
+  `toArray()`).
 
 ### Fixed
 - **`GET /rbac/roles/*` (and every `RoleController` route) no longer 500s.** The `RoleController`

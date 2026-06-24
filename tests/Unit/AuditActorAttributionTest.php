@@ -55,7 +55,7 @@ final class AuditActorAttributionTest extends TestCase
 
         // The DTO has no `assigned_by` field, so the actor can only come from auth.user.
         $request = Request::create('/x', 'POST');
-        $request->attributes->set('uuid', 'role-1');
+        $request->attributes->set('_route_params', ['uuid' => 'role-1']);
         $request->attributes->set('auth.user', new UserIdentity('real-admin', ['administrator']));
 
         $response = $controller->assignToUser(new AssignRoleToUserData(user_uuid: 'target-user'), $request);
