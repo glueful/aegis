@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-06-24
+
+### Changed
+- **Assigning a permission directly to a user no longer requires `system.config`.** The user-side
+  assignment routes — `POST /rbac/permissions/{uuid}/assign`, `DELETE /rbac/permissions/{uuid}/revoke`,
+  `POST /rbac/permissions/batch-assign`, `POST /rbac/permissions/batch-revoke` — are now gated
+  `users.edit` (the user-side analog of `roles.edit`, which already gates editing a role's
+  permissions), so administrators can manage a user's direct permissions. **Defining** permissions
+  (`create`/`update`/`delete`) stays superuser-only (`system.config`).
+
+### Fixed
+- **`Permission` and `UserPermission` now implement `JsonSerializable`.** Like `RolePermission` in
+  1.10.2, their private properties encoded to `{}` — so `GET /rbac/users/{uuid}/permissions` (a user's
+  direct permissions) returned entries whose nested `permission` carried no slug/uuid. Both now
+  serialize via `toArray()`.
+
 ## [1.10.2] - 2026-06-24
 
 ### Fixed

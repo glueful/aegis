@@ -13,7 +13,7 @@ namespace Glueful\Extensions\Aegis\Models;
  * - System permission protection
  * - Metadata support for flexible permissions
  */
-class Permission
+class Permission implements \JsonSerializable
 {
     private string $uuid;
     private string $name;
@@ -185,6 +185,18 @@ class Permission
             'metadata' => json_encode($this->metadata),
             'created_at' => $this->createdAt
         ];
+    }
+
+    /**
+     * Serialize for JSON responses. Without this, the model's private properties encode to an empty
+     * object (`{}`), so endpoints returning Permission objects (e.g. a user's direct permissions)
+     * would carry no slug/uuid for clients to read.
+     *
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**
