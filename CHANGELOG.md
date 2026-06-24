@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.11.0] - 2026-06-24
+## [1.12.0] - 2026-06-24
+
+### Added
+- **Roles now appear on the identity store's user records.** A new `UserRoleEnricher` (tagged
+  `users.record_enricher`, the framework 1.62.0 seam) attaches each user's `roles` —
+  `[{uuid,name,slug}]` — to the records glueful/users returns on `/users`, `/users/{uuid}` and `/me`,
+  so an admin sees roles inline without a second request. It batch-loads via a new
+  `UserRoleRepository::getRolesForUsers()` (one JOIN for the whole page — no N+1; excludes
+  soft-deleted roles and expired assignments). glueful/users needs no dependency on Aegis. Requires
+  framework `^1.62.0`.
 
 ### Changed
 - **Assigning a permission directly to a user no longer requires `system.config`.** The user-side
