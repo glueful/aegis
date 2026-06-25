@@ -4,6 +4,8 @@ namespace Glueful\Extensions\Aegis\Repositories;
 
 use Glueful\Repository\BaseRepository;
 use Glueful\Extensions\Aegis\Models\UserRole;
+use Glueful\Extensions\Aegis\Events\RoleAssignedEvent;
+use Glueful\Extensions\Aegis\Events\RoleRevokedEvent;
 use Glueful\Helpers\Utils;
 
 /**
@@ -329,7 +331,12 @@ class UserRoleRepository extends BaseRepository
             $data['scope'] = json_encode($options['scope']);
         }
 
-        return $this->createUserRole($data);
+        $userRole = $this->createUserRole($data);
+        if ($userRole !== null) {
+            $this->dispatchEvent(new RoleAssignedEvent($userUuid, $roleUuid, $options));
+        }
+
+        return $userRole;
     }
 
     /**
@@ -348,15 +355,38 @@ class UserRoleRepository extends BaseRepository
 
     public function revokeRole(string $userUuid, string $roleUuid): bool
     {
-        return (bool) $this->db->table($this->table)->where([
+        $deleted = (bool) $this->db->table($this->table)->where([
             'user_uuid' => $userUuid,
             'role_uuid' => $roleUuid
         ])->delete();
+
+        if ($deleted) {
+            $this->dispatchEvent(new RoleRevokedEvent($userUuid, $roleUuid));
+        }
+
+        return $deleted;
     }
 
     public function revokeAllUserRoles(string $userUuid): bool
     {
-        return (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+        // Read the role_uuids first so we can emit one semantic event per removed pair.
+        $roleUuids = array_column(
+            $this->db->table($this->table)
+                ->select(['role_uuid'])
+                ->where(['user_uuid' => $userUuid])
+                ->get(),
+            'role_uuid'
+        );
+
+        $deleted = (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+
+        if ($deleted) {
+            foreach ($roleUuids as $roleUuid) {
+                $this->dispatchEvent(new RoleRevokedEvent($userUuid, (string) $roleUuid));
+            }
+        }
+
+        return $deleted;
     }
 
     /**

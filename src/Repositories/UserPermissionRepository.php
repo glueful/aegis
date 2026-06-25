@@ -4,6 +4,8 @@ namespace Glueful\Extensions\Aegis\Repositories;
 
 use Glueful\Repository\BaseRepository;
 use Glueful\Extensions\Aegis\Models\UserPermission;
+use Glueful\Extensions\Aegis\Events\PermissionAssignedEvent;
+use Glueful\Extensions\Aegis\Events\PermissionRevokedEvent;
 use Glueful\Helpers\Utils;
 
 /**
@@ -67,6 +69,24 @@ class UserPermissionRepository extends BaseRepository
         if (!$success) {
             throw new \RuntimeException('Failed to create user permission');
         }
+
+        // Grant chokepoint: decode the JSON resource_filter (there is NO `resource` key)
+        // and emit the semantic grant event.
+        $rf = isset($data['resource_filter']) && is_string($data['resource_filter'])
+            ? json_decode($data['resource_filter'], true)
+            : null;
+        $this->dispatchEvent(new PermissionAssignedEvent(
+            (string) ($data['user_uuid'] ?? ''),
+            (string) ($data['permission_uuid'] ?? ''),
+            array_filter(
+                [
+                    'resource_filter' => $rf,
+                    'granted_by' => $data['granted_by'] ?? null,
+                    'expires_at' => $data['expires_at'] ?? null,
+                ],
+                static fn($v) => $v !== null
+            ),
+        ));
 
         return $data['uuid'];
     }
@@ -245,15 +265,38 @@ class UserPermissionRepository extends BaseRepository
 
     public function revokeUserPermission(string $userUuid, string $permissionUuid): bool
     {
-        return (bool) $this->db->table($this->table)->where([
+        $deleted = (bool) $this->db->table($this->table)->where([
             'user_uuid' => $userUuid,
             'permission_uuid' => $permissionUuid
         ])->delete();
+
+        if ($deleted) {
+            $this->dispatchEvent(new PermissionRevokedEvent($userUuid, $permissionUuid));
+        }
+
+        return $deleted;
     }
 
     public function revokeAllUserPermissions(string $userUuid): bool
     {
-        return (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+        // Read the permission_uuids first so we can emit one semantic event per removed grant.
+        $permissionUuids = array_column(
+            $this->db->table($this->table)
+                ->select(['permission_uuid'])
+                ->where(['user_uuid' => $userUuid])
+                ->get(),
+            'permission_uuid'
+        );
+
+        $deleted = (bool) $this->db->table($this->table)->where(['user_uuid' => $userUuid])->delete();
+
+        if ($deleted) {
+            foreach (array_unique($permissionUuids) as $permissionUuid) {
+                $this->dispatchEvent(new PermissionRevokedEvent($userUuid, (string) $permissionUuid));
+            }
+        }
+
+        return $deleted;
     }
 
     /**

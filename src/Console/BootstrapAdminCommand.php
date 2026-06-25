@@ -74,11 +74,14 @@ final class BootstrapAdminCommand extends BaseCommand
         );
 
         // 2) Bootstrap: resolve user, create/reuse role, additively grant, assign role.
+        //    Pass the application context into each repository so BaseRepository::dispatchEvent()
+        //    fires (it no-ops with a null context) when these repos emit RBAC domain events.
+        $context = $this->getContext();
         $service = new BootstrapAdminService(
             $this->getService(UserProviderInterface::class),
-            new RoleRepository(),
-            new PermissionRepository(),
-            new RolePermissionRepository(),
+            new RoleRepository(null, $context),
+            new PermissionRepository(null, $context),
+            new RolePermissionRepository(null, $context),
             $provider,
         );
 

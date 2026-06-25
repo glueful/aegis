@@ -49,11 +49,36 @@ class AegisServiceProvider extends ServiceProvider
     public static function services(): array
     {
         return [
-            RoleRepository::class => ['class' => RoleRepository::class, 'shared' => true],
-            PermissionRepository::class => ['class' => PermissionRepository::class, 'shared' => true],
-            UserRoleRepository::class => ['class' => UserRoleRepository::class, 'shared' => true],
-            UserPermissionRepository::class => ['class' => UserPermissionRepository::class, 'shared' => true],
-            RolePermissionRepository::class => ['class' => RolePermissionRepository::class, 'shared' => true],
+            // Repos are injected with the ApplicationContext (constructor arg 2; arg 1 is the
+            // optional Connection, left null to use the shared one). Without it,
+            // BaseRepository::dispatchEvent() no-ops, so RBAC domain events fired from the
+            // service/controller layer (which receive these DI-built repos) would silently never
+            // dispatch — only the provider, which builds its own context-bearing repos, would.
+            RoleRepository::class => [
+                'class' => RoleRepository::class,
+                'shared' => true,
+                'arguments' => [null, '@' . ApplicationContext::class],
+            ],
+            PermissionRepository::class => [
+                'class' => PermissionRepository::class,
+                'shared' => true,
+                'arguments' => [null, '@' . ApplicationContext::class],
+            ],
+            UserRoleRepository::class => [
+                'class' => UserRoleRepository::class,
+                'shared' => true,
+                'arguments' => [null, '@' . ApplicationContext::class],
+            ],
+            UserPermissionRepository::class => [
+                'class' => UserPermissionRepository::class,
+                'shared' => true,
+                'arguments' => [null, '@' . ApplicationContext::class],
+            ],
+            RolePermissionRepository::class => [
+                'class' => RolePermissionRepository::class,
+                'shared' => true,
+                'arguments' => [null, '@' . ApplicationContext::class],
+            ],
 
             RoleService::class => [
                 'class' => RoleService::class,

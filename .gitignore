@@ -21,3 +21,6 @@
 # --- OS / Misc ---
 .DS_Store
 *.log
+
+/storage/
+:memory:

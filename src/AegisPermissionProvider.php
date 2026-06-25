@@ -103,7 +103,7 @@ public function initialize(array $config = []): void
     private function getRoleRepository(): RoleRepository
     {
         if ($this->roleRepository === null) {
-            $this->roleRepository = new RoleRepository();
+            $this->roleRepository = new RoleRepository(null, $this->context);
         }
         return $this->roleRepository;
     }
@@ -114,7 +114,7 @@ public function initialize(array $config = []): void
     private function getPermissionRepository(): PermissionRepository
     {
         if ($this->permissionRepository === null) {
-            $this->permissionRepository = new PermissionRepository();
+            $this->permissionRepository = new PermissionRepository(null, $this->context);
         }
         return $this->permissionRepository;
     }
@@ -125,7 +125,7 @@ public function initialize(array $config = []): void
     private function getUserRoleRepository(): UserRoleRepository
     {
         if ($this->userRoleRepository === null) {
-            $this->userRoleRepository = new UserRoleRepository();
+            $this->userRoleRepository = new UserRoleRepository(null, $this->context);
         }
         return $this->userRoleRepository;
     }
@@ -136,7 +136,7 @@ public function initialize(array $config = []): void
     private function getUserPermissionRepository(): UserPermissionRepository
     {
         if ($this->userPermissionRepository === null) {
-            $this->userPermissionRepository = new UserPermissionRepository();
+            $this->userPermissionRepository = new UserPermissionRepository(null, $this->context);
         }
         return $this->userPermissionRepository;
     }
@@ -147,7 +147,7 @@ public function initialize(array $config = []): void
     private function getRolePermissionRepository(): RolePermissionRepository
     {
         if ($this->rolePermissionRepository === null) {
-            $this->rolePermissionRepository = new RolePermissionRepository();
+            $this->rolePermissionRepository = new RolePermissionRepository(null, $this->context);
         }
         return $this->rolePermissionRepository;
     }
