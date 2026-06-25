@@ -6,6 +6,8 @@ namespace Glueful\Extensions\Aegis\Repositories;
 
 use Glueful\Repository\BaseRepository;
 use Glueful\Extensions\Aegis\Models\RolePermission;
+use Glueful\Extensions\Aegis\Events\RolePermissionAssignedEvent;
+use Glueful\Extensions\Aegis\Events\RolePermissionRevokedEvent;
 use Glueful\Helpers\Utils;
 
 /**
@@ -82,6 +84,8 @@ class RolePermissionRepository extends BaseRepository
             return null;
         }
 
+        $this->dispatchEvent(new RolePermissionAssignedEvent($roleUuid, $permissionUuid, $options));
+
         // Retrieve the full record
         $createdRecord = $this->find($createdUuid);
         return $createdRecord ? new RolePermission($createdRecord) : null;
@@ -106,7 +110,9 @@ class RolePermissionRepository extends BaseRepository
         }
 
         foreach ($assignments as $assignment) {
-            $this->delete($assignment['uuid']);
+            if ($this->delete($assignment['uuid'])) {
+                $this->dispatchEvent(new RolePermissionRevokedEvent($roleUuid, $permissionUuid));
+            }
         }
 
         return true;
@@ -263,10 +269,11 @@ class RolePermissionRepository extends BaseRepository
      */
     public function replaceRolePermissions(string $roleUuid, array $permissionUuids, array $options = []): bool
     {
-        // Remove all existing permissions
+        // Remove all existing permissions via the semantic method so each removed
+        // link emits a RolePermissionRevokedEvent (a raw delete() loop bypasses it).
         $existing = $this->getRolePermissions($roleUuid);
         foreach ($existing as $assignment) {
-            $this->delete($assignment->getUuid());
+            $this->revokePermissionFromRole($roleUuid, $assignment->getPermissionUuid());
         }
 
         // Assign new permissions

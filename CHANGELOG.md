@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-06-25
+
+### Added
+- **RBAC domain events for audit / notification / cache integration.** Six PSR-14 events under
+  `Glueful\Extensions\Aegis\Events\` are now dispatched from the pivot repositories on real mutations:
+  `RoleAssignedEvent` / `RoleRevokedEvent` (user↔role), `PermissionAssignedEvent` /
+  `PermissionRevokedEvent` (direct user↔permission grant), and `RolePermissionAssignedEvent` /
+  `RolePermissionRevokedEvent` (role↔permission). They fire from the single repository chokepoint every
+  entry point converges on (`UserRoleRepository::assignRole/revokeRole/revokeAllUserRoles`,
+  `UserPermissionRepository::create/revokeUserPermission/revokeAllUserPermissions`,
+  `RolePermissionRepository::assignPermissionToRole/revokePermissionFromRole/batch*`) — **exactly once**
+  per semantic action, one per affected item for batch/replace, and **nothing on a no-op** (re-assigning
+  an existing grant, revoking an absent one). This lets an extension (e.g. glueful/audit) record
+  *semantic* RBAC actions ("assigned Admin to Jane") rather than raw pivot-table writes, with no coupling
+  back to Aegis. Requires framework `^1.63.0` (the new `protected BaseRepository::dispatchEvent()`).
+
+### Fixed
+- **Pivot repositories now receive `ApplicationContext`, so the domain events (and the framework's entity
+  events) actually dispatch.** The provider's lazy getters, `BootstrapAdminCommand`, and — critically —
+  the `AegisServiceProvider` DI definitions all built `UserRoleRepository` / `UserPermissionRepository` /
+  `RolePermissionRepository` with a null context, which `BaseRepository::dispatchEvent()` silently no-ops
+  on. Every repo is now constructed with context (DI `arguments`, provider getters, command), so events
+  fire from every entry point (controller, provider, service, batch, bootstrap).
+- **`RolePermissionRepository::replaceRolePermissions()` now emits revoke events for removed links.** It
+  removed existing grants with a raw `delete()` loop that bypassed the semantic `revokePermissionFromRole`,
+  so a role-permission *replace/sync* dropped links without a `RolePermissionRevokedEvent`. Removals now
+  route through the semantic method.
+
 ## [1.12.0] - 2026-06-24
 
 ### Added

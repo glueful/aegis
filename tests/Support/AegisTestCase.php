@@ -6,11 +6,16 @@ namespace Glueful\Extensions\Aegis\Tests\Support;
 
 use Glueful\Bootstrap\ApplicationContext;
 use Glueful\Database\Connection;
+use Glueful\Events\Contracts\BaseEvent;
+use Glueful\Events\EventDispatcher;
+use Glueful\Events\EventService;
+use Glueful\Events\ListenerProvider;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\Repositories\PermissionRepository;
 use Glueful\Extensions\Aegis\Repositories\RoleRepository;
 use Glueful\Helpers\Utils;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 
 /**
  * Lightweight SQLite harness for Aegis catalog tests.
@@ -21,17 +26,35 @@ use PHPUnit\Framework\TestCase;
 abstract class AegisTestCase extends TestCase
 {
     protected Connection $connection;
+    protected ApplicationContext $context;
     private string $dbPath;
+
+    /**
+     * Domain events captured during a test. The pivot repos dispatch via
+     * BaseRepository::dispatchEvent() -> app($context, EventService::class)->dispatch(),
+     * so we put a real EventService (with a catch-all BaseEvent listener) behind a minimal
+     * container on $this->context. Without this container, getContainer() throws and
+     * dispatchEvent() swallows it — events would silently never fire.
+     *
+     * @var list<BaseEvent>
+     */
+    protected array $recordedEvents = [];
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->dbPath = sys_get_temp_dir() . '/aegis-' . uniqid('', true) . '.sqlite';
+        // Build the test context first and bind it to the SQLite connection. BaseRepository's
+        // shared connection is only replaced when a context arrives and the current shared
+        // connection hasContext() === false; binding it here keeps repos constructed WITH this
+        // context (production wiring) from swapping our in-test SQLite db for a default one.
+        $this->context = ApplicationContext::forTesting(sys_get_temp_dir());
+        $this->installEventCapture();
         $this->connection = new Connection([
             'engine' => 'sqlite',
             'sqlite' => ['primary' => $this->dbPath],
             'pooling' => ['enabled' => false],
-        ]);
+        ], $this->context);
         $this->createSchema();
         // Register as the shared repository connection (BaseRepository::$sharedConnection).
         new PermissionRepository($this->connection);
@@ -86,7 +109,63 @@ abstract class AegisTestCase extends TestCase
 
     protected function makeProvider(): AegisPermissionProvider
     {
-        return new AegisPermissionProvider(ApplicationContext::forTesting(sys_get_temp_dir()));
+        return new AegisPermissionProvider($this->context);
+    }
+
+    /**
+     * Build a real EventService whose dispatcher records every BaseEvent into
+     * $this->recordedEvents, and expose it through a minimal PSR-11 container set on the
+     * test context so app($context, EventService::class) returns exactly this instance.
+     */
+    private function installEventCapture(): void
+    {
+        $this->recordedEvents = [];
+
+        $provider = new ListenerProvider();
+        // Catch-all: a listener on BaseEvent receives every subclass (InheritanceResolver
+        // walks parents), so we record all dispatched RBAC domain events.
+        $provider->addListener(BaseEvent::class, function (BaseEvent $event): void {
+            $this->recordedEvents[] = $event;
+        });
+        $eventService = new EventService(new EventDispatcher($provider), $provider);
+
+        $container = new class ($eventService) implements ContainerInterface {
+            public function __construct(private EventService $eventService)
+            {
+            }
+
+            public function get(string $id): mixed
+            {
+                if ($id === EventService::class) {
+                    return $this->eventService;
+                }
+                throw new class ('No entry for ' . $id)
+                    extends \RuntimeException implements \Psr\Container\NotFoundExceptionInterface {
+                };
+            }
+
+            public function has(string $id): bool
+            {
+                return $id === EventService::class;
+            }
+        };
+
+        $this->context->setContainer($container);
+    }
+
+    /**
+     * Captured events of a given class.
+     *
+     * @template T of BaseEvent
+     * @param class-string<T> $class
+     * @return list<T>
+     */
+    protected function eventsOfType(string $class): array
+    {
+        return array_values(array_filter(
+            $this->recordedEvents,
+            static fn(BaseEvent $e): bool => $e instanceof $class
+        ));
     }
 
     /** @param array<string,mixed> $row */
