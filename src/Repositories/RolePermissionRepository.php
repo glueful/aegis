@@ -260,26 +260,48 @@ class RolePermissionRepository extends BaseRepository
     }
 
     /**
-     * Replace all permissions for a role
+     * Replace a role's permissions so its live grants become exactly $permissionUuids.
+     *
+     * Reconciles by diffing against the current live set: only genuinely added or removed
+     * links are written, so re-applying an unchanged set is a no-op — no soft-delete
+     * tombstones and no revoke/assign event churn. Each real change still flows through the
+     * semantic revoke/assign methods, so RolePermission{Revoked,Assigned}Event fire for
+     * exactly the links that changed. Comparison is by permission UUID only (these callers
+     * pass bare UUID lists); per-grant option changes on an unchanged link are not detected.
      *
      * @param string $roleUuid Role UUID
-     * @param list<string> $permissionUuids New permission UUIDs
-     * @param array<string, mixed> $options Assignment options
+     * @param list<string> $permissionUuids Desired permission UUIDs
+     * @param array<string, mixed> $options Assignment options applied to newly added links
      * @return bool Success status
      */
     public function replaceRolePermissions(string $roleUuid, array $permissionUuids, array $options = []): bool
     {
-        // Remove all existing permissions via the semantic method so each removed
-        // link emits a RolePermissionRevokedEvent (a raw delete() loop bypasses it).
-        $existing = $this->getRolePermissions($roleUuid);
-        foreach ($existing as $assignment) {
-            $this->revokePermissionFromRole($roleUuid, $assignment->getPermissionUuid());
+        $desired = array_values(array_unique($permissionUuids));
+
+        // getRolePermissions() reads through the soft-delete scope, so $current is the role's
+        // *live* permission set (tombstones excluded), deduped by permission UUID.
+        $current = [];
+        foreach ($this->getRolePermissions($roleUuid) as $assignment) {
+            $current[$assignment->getPermissionUuid()] = true;
+        }
+        $current = array_keys($current);
+
+        $failed = 0;
+
+        // Revoke only the links that are no longer desired.
+        foreach (array_diff($current, $desired) as $permissionUuid) {
+            if (!$this->revokePermissionFromRole($roleUuid, $permissionUuid)) {
+                $failed++;
+            }
         }
 
-        // Assign new permissions
-        $results = $this->batchAssignPermissions($roleUuid, $permissionUuids, $options);
+        // Assign only the genuinely new links; untouched links keep their existing rows.
+        $toAdd = array_values(array_diff($desired, $current));
+        if ($toAdd !== []) {
+            $failed += $this->batchAssignPermissions($roleUuid, $toAdd, $options)['failed'];
+        }
 
-        return $results['failed'] === 0;
+        return $failed === 0;
     }
 
     /**
