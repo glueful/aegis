@@ -413,11 +413,10 @@ final class RbacEventExactlyOnceTest extends AegisTestCase
     }
 
     /**
-     * Direct repo-level replace from {read, write} to {write, delete}: documents the current
-     * replaceRolePermissions behaviour (revoke-all then re-assign), and pins the NET outcome —
-     * read revoked-not-readded, delete added-not-revoked — so a future "diff-only" optimisation
-     * has a guard. write churns (revoke+assign) under the current impl; we assert it is NOT
-     * net-removed (ends up assigned) rather than asserting zero churn.
+     * Direct repo-level replace from {read, write} to {write, delete}: replaceRolePermissions
+     * now reconciles by diff, so it touches ONLY the changed members — read is revoked, delete
+     * is assigned, and the unchanged write is left alone (no revoke/assign churn). Pins both the
+     * per-member event deltas and the final live grant set.
      */
     public function test_repo_replace_role_permissions_net_delta(): void
     {
@@ -443,7 +442,16 @@ final class RbacEventExactlyOnceTest extends AegisTestCase
         // delete: assigned, never revoked (net added).
         self::assertContains('perm-delete', $assigned);
         self::assertNotContains('perm-delete', $revoked);
-        // write (unchanged): ends up assigned in the final set (not net-removed).
-        self::assertContains('perm-write', $assigned);
+        // write (unchanged): left untouched — neither revoked nor re-assigned.
+        self::assertNotContains('perm-write', $revoked, 'unchanged grant is not revoked');
+        self::assertNotContains('perm-write', $assigned, 'unchanged grant is not re-assigned');
+
+        // Final live grant set is exactly {write, delete}.
+        $live = array_map(
+            static fn($a) => $a->getPermissionUuid(),
+            $repo->getRolePermissions('role-editor')
+        );
+        sort($live);
+        self::assertSame(['perm-delete', 'perm-write'], $live);
     }
 }

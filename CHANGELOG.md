@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-06-26
+
+### Changed
+- **`replaceRolePermissions()` now reconciles role grants by diff instead of revoke-all-then-reassign.**
+  Re-applying a role's permission set — via `permissions:sync` or editing a role in the admin UI — previously
+  revoked *every* existing grant and re-inserted the *entire* desired set, leaving a soft-delete tombstone per
+  grant and emitting a full `RolePermissionRevokedEvent` + `RolePermissionAssignedEvent` burst on every run,
+  even when nothing changed. It now diffs the desired set against the role's current **live** grants and touches
+  only the difference: revokes only removed links, assigns only new ones, and leaves unchanged grants alone. An
+  unchanged sync/edit now writes nothing and emits no events, so downstream audit / cache consumers see only
+  real changes (no more tombstone buildup or spurious churn). End-state semantics are unchanged — the role's
+  live grants still become exactly the supplied set — and duplicate UUIDs in the input are de-duplicated.
+
 ## [1.13.0] - 2026-06-25
 
 ### Added
