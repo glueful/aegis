@@ -153,16 +153,28 @@ class UserRole
     }
 
     /**
-     * @param array<string, mixed> $requiredScope
+     * Whether this assignment applies within the given request scope context.
+     *
+     * FAIL-CLOSED SEMANTICS: an assignment that carries scope (e.g. `{tenant_id: A}`)
+     * is a CONSTRAINT — every key it declares must be present and equal in the request
+     * context. A request with NO scope context therefore never satisfies a scoped
+     * assignment (previously it matched trivially, which let a tenant-scoped role act
+     * as global through any caller that omitted scope). The comparison direction is
+     * assignment-constraints ⊆ request-context: extra request keys the assignment
+     * does not constrain are irrelevant. An UNSCOPED assignment is global and matches
+     * any request context, including an empty one.
+     *
+     * @param array<string, mixed> $requestScope the scope context of the current check
      */
-    public function matchesScope(array $requiredScope): bool
+    public function matchesScope(array $requestScope): bool
     {
-        if (!$this->hasScope()) {
+        $constraints = $this->scope ?? [];
+        if ($constraints === []) {
             return true; // No scope restriction means it applies globally
         }
 
-        foreach ($requiredScope as $key => $value) {
-            if (!isset($this->scope[$key]) || $this->scope[$key] !== $value) {
+        foreach ($constraints as $key => $value) {
+            if (!array_key_exists($key, $requestScope) || $requestScope[$key] !== $value) {
                 return false;
             }
         }

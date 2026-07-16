@@ -102,4 +102,51 @@ final class ScopedRoleDecisionTest extends AegisTestCase
             $scope === [] ? null : json_encode($scope),
         ]);
     }
+
+    // THE fail-open regression this suite previously missed: a tenant-scoped assignment
+    // must never satisfy a check that carries NO scope context. Before the fix, an empty
+    // scope skipped filtering entirely and the tenant-A role answered globally.
+    public function test_scoped_role_never_satisfies_a_scopeless_check(): void
+    {
+        $this->seedGrantedRole('entries.edit', 'editor', 'permission-1', 'editor-role');
+        $this->assignRoleDirectly('user-1', 'editor-role', ['tenant_id' => 'tenant_1']);
+
+        $provider = $this->makeInitializedProvider();
+
+        self::assertFalse(
+            $provider->can('user-1', 'entries.edit', '*', []),
+            'a tenant-scoped role must not act as global when the check has no scope context'
+        );
+        self::assertFalse(
+            $provider->can('user-1', 'entries.edit', '*', ['scope' => []]),
+            'an explicitly empty scope context is the same scopeless check'
+        );
+    }
+
+    public function test_global_role_satisfies_scopeless_and_scoped_checks(): void
+    {
+        $this->seedGrantedRole('entries.edit', 'editor', 'permission-1', 'editor-role');
+        $this->assignRoleDirectly('user-1', 'editor-role'); // no scope = unscoped/global
+
+        $provider = $this->makeInitializedProvider();
+
+        self::assertTrue($provider->can('user-1', 'entries.edit', '*', []));
+        self::assertTrue(
+            $provider->can('user-1', 'entries.edit', '*', ['scope' => ['tenant_id' => 'tenant_1']])
+        );
+    }
+
+    // Enumeration surfaces keep their contract: listing a user's roles without scope must
+    // still show scoped assignments (admin screens manage them) — fail-closed matching is
+    // an AUTHORIZATION semantic, not an enumeration one.
+    public function test_listing_without_scope_still_returns_scoped_assignments(): void
+    {
+        $this->seedRole(['uuid' => 'editor-role', 'slug' => 'editor']);
+        $this->assignRoleDirectly('user-1', 'editor-role', ['tenant_id' => 'tenant_1']);
+
+        $rows = (new UserRoleRepository())->getUserRoles('user-1');
+
+        self::assertCount(1, $rows);
+        self::assertSame('editor-role', $rows[0]->getRoleUuid());
+    }
 }

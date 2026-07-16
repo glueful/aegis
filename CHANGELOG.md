@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-07-16
+
+### Security
+- **Tenant-scoped role assignments now fail closed.** A role assignment carrying scope (e.g.
+  `{tenant_id: A}`) previously satisfied any authorization check that arrived with NO scope
+  context: the repository skipped scope filtering entirely for an empty scope, and
+  `UserRole::matchesScope()` matched trivially — so through Aegis's own `RequirePermission`
+  middleware (whose scope channel was also mis-wired, see below) a tenant-scoped role
+  effectively acted as a **global** grant. Scoped matching is now a constraint check in the
+  correct direction — every key the ASSIGNMENT declares must be present and equal in the
+  request's scope context — so a scopeless or differently-scoped check is only ever satisfied
+  by global (unscoped) assignments. Authorization decisions go through a new
+  `UserRoleRepository::getUserRolesForAuthorization()` that always applies this matching;
+  the enumeration contract of `getUserRoles()` (empty scope returns every assignment, for
+  role-management/listing surfaces) is unchanged.
+
+### Fixed
+- **`RequirePermission` now actually feeds the tenant into scoped-role matching.** The
+  middleware put `tenant_id` at the context ROOT — which the provider never reads (it reads
+  `context['scope']`) — and sourced it from a `tenant.id` request attribute nothing populates.
+  It now builds `context['scope']['tenant_id']` from, in order: the `tenant.id` request
+  attribute (Aegis's documented integration seam for any host/tenancy layer), then the
+  first-party glueful/tenancy convention (the resolved tenant stored in `ApplicationContext`
+  request state under `tenancy.tenant`, read by key with a duck-typed `uuid` — no class
+  dependency). With no resolvable tenant the scope stays empty and, per the fail-closed
+  matching above, only global assignments can satisfy the check.
+
+### Upgrade Notes
+- If an application relied on a scoped assignment being honored WITHOUT supplying scope
+  context, that check now denies — supply `context['scope']` (the middleware does this
+  automatically once a tenant is resolvable) or assign the role unscoped where global
+  behavior is genuinely intended. Multi-key scoped assignments now also require EVERY
+  declared key to be satisfied (previously the comparison direction allowed partial
+  matches in one direction).
+
 ## [1.13.1] - 2026-06-26
 
 ### Changed
