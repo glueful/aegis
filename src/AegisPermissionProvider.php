@@ -678,7 +678,30 @@ public function initialize(array $config = []): void
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
     {
-        $userRoles = $this->getUserRoleRepository()->getUserRoles($userUuid, $scope);
+        return $this->mapToRoles($this->getUserRoleRepository()->getUserRoles($userUuid, $scope));
+    }
+
+    /**
+     * Authorization view of a user's roles: scope matching is ALWAYS applied (fail-closed),
+     * unlike the enumeration contract of {@see self::getUserRoles()} where an empty scope
+     * returns every assignment for listing/management surfaces.
+     *
+     * @param array<string, mixed> $scope
+     * @return list<Role>
+     */
+    private function getAuthorizedRoles(string $userUuid, array $scope): array
+    {
+        return $this->mapToRoles(
+            $this->getUserRoleRepository()->getUserRolesForAuthorization($userUuid, $scope)
+        );
+    }
+
+    /**
+     * @param list<\Glueful\Extensions\Aegis\Models\UserRole> $userRoles
+     * @return list<Role>
+     */
+    private function mapToRoles(array $userRoles): array
+    {
         $roles = [];
 
         // Extract role UUIDs first
@@ -754,7 +777,10 @@ public function initialize(array $config = []): void
         string $resource,
         array $context = []
     ): bool {
-        $userRoles = $this->getUserRoles($userUuid, $this->scopeFromContext($context));
+        // Authorization path: ALWAYS scope-matched (fail-closed). A check that carries no
+        // scope context can only be satisfied by GLOBAL (unscoped) assignments — a
+        // tenant-scoped role never answers for a scopeless or differently-scoped check.
+        $userRoles = $this->getAuthorizedRoles($userUuid, $this->scopeFromContext($context));
 
         foreach ($userRoles as $role) {
             if ($this->roleHasPermission($role, $permission, $resource)) {

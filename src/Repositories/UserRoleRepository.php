@@ -241,10 +241,51 @@ class UserRoleRepository extends BaseRepository
     }
 
     /**
+     * ENUMERATION contract (listing/management surfaces): with an empty `$scope`, EVERY
+     * active assignment is returned — scoped ones included — so admin screens can see and
+     * manage tenant-scoped assignments. With a non-empty `$scope`, assignments are
+     * filtered by {@see UserRole::matchesScope()}. Authorization decisions must NOT use
+     * this method with an empty scope; they go through
+     * {@see self::getUserRolesForAuthorization()}, which always applies scope matching.
+     *
      * @param array<string, mixed> $scope
      * @return list<UserRole>
      */
     public function getUserRoles(string $userUuid, array $scope = []): array
+    {
+        $userRoles = $this->activeUserRoles($userUuid);
+
+        // Filter by scope if provided (empty scope = enumeration: return everything)
+        if (!empty($scope)) {
+            $userRoles = array_filter($userRoles, function ($role) use ($scope) {
+                return $role->matchesScope($scope);
+            });
+        }
+
+        return array_values($userRoles);
+    }
+
+    /**
+     * AUTHORIZATION contract: scope matching is ALWAYS applied. Unscoped (global)
+     * assignments match any request context; scoped assignments match only a context
+     * that satisfies every constraint they declare — in particular, a request with NO
+     * scope context never activates a tenant-scoped assignment (fail-closed). This is
+     * the method permission decisions must use; the empty-scope-returns-all behavior of
+     * {@see self::getUserRoles()} exists for enumeration surfaces only.
+     *
+     * @param array<string, mixed> $scope the request's scope context (may be empty)
+     * @return list<UserRole>
+     */
+    public function getUserRolesForAuthorization(string $userUuid, array $scope): array
+    {
+        return array_values(array_filter(
+            $this->activeUserRoles($userUuid),
+            fn(UserRole $role) => $role->matchesScope($scope)
+        ));
+    }
+
+    /** @return list<UserRole> */
+    private function activeUserRoles(string $userUuid): array
     {
         // Only get active (non-expired) roles
         $currentTime = $this->db->getDriver()->formatDateTime();
@@ -257,19 +298,7 @@ class UserRoleRepository extends BaseRepository
                   ->orWhereNull('expires_at');
             });
 
-        $results = $query->get();
-        $userRoles = array_map(fn($row) => new UserRole($row), $results);
-
-        // Filter by scope if provided
-        if (!empty($scope)) {
-            $userRoles = array_filter($userRoles, function ($role) use ($scope) {
-                return $role->matchesScope($scope);
-            });
-        }
-
-        $userRoles = array_values($userRoles);
-
-        return $userRoles;
+        return array_map(fn($row) => new UserRole($row), $query->get());
     }
 
     /**

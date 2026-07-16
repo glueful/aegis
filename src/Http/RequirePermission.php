@@ -58,10 +58,18 @@ final class RequirePermission implements RouteMiddleware
             ? trim($params[1])
             : 'system';
 
+        $tenantId = $this->resolveTenantId($request);
+
         $context = [
             'roles' => $user->roles(),
             'scopes' => $user->scopes(),
-            'tenant_id' => $request->attributes->get('tenant.id'),
+            // The provider's scoped-role matching reads `scope` — a tenant-scoped role
+            // assignment only activates when the request's tenant is established here.
+            // With no resolvable tenant the scope stays empty, and (fail-closed) only
+            // GLOBAL role assignments can satisfy the check.
+            'scope' => $tenantId !== null ? ['tenant_id' => $tenantId] : [],
+            // Kept at the root too for log/context consumers; the provider does not read it.
+            'tenant_id' => $tenantId,
             'route_params' => (array) $request->attributes->get('route.params'),
             'jwt_claims' => (array) $request->attributes->get('jwt.claims'),
         ];
@@ -71,6 +79,38 @@ final class RequirePermission implements RouteMiddleware
         }
 
         return $next($request);
+    }
+
+    /**
+     * The active tenant for scope matching, resolved from two seams in order:
+     *
+     * 1. The `tenant.id` request attribute — Aegis's own documented integration point.
+     *    Any host or tenancy layer may set it (a string tenant identifier) to activate
+     *    scoped-role matching without Aegis knowing that layer's internals.
+     * 2. The first-party glueful/tenancy convention: the resolved tenant object stored
+     *    in `ApplicationContext` request state under `tenancy.tenant`, read here by KEY
+     *    with a duck-typed `uuid` — a soft convention, not a class dependency, so Aegis
+     *    still installs without the tenancy extension.
+     *
+     * Returns null when no tenant is resolvable — scope stays empty and scoped role
+     * assignments (correctly) cannot activate.
+     */
+    private function resolveTenantId(Request $request): ?string
+    {
+        $attribute = $request->attributes->get('tenant.id');
+        if (is_string($attribute) && trim($attribute) !== '') {
+            return trim($attribute);
+        }
+
+        $tenant = $this->context->getRequestState('tenancy.tenant');
+        if (is_object($tenant)) {
+            $uuid = $tenant->uuid ?? null;
+            if (is_string($uuid) && trim($uuid) !== '') {
+                return trim($uuid);
+            }
+        }
+
+        return null;
     }
 
     private function permissionManager(): ?PermissionManager
