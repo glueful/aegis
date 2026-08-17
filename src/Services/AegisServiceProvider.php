@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Glueful\Extensions\Aegis\Services;
 
 use Glueful\Bootstrap\ApplicationContext;
-use Glueful\Database\Migrations\MigrationPriority;
 use Glueful\Extensions\ServiceProvider;
 use Glueful\Extensions\Aegis\AegisPermissionProvider;
 use Glueful\Extensions\Aegis\IdentityClaimsProvider;
@@ -208,17 +207,8 @@ class AegisServiceProvider extends ServiceProvider
             }
         }
 
-        // 3) Register migrations directory (low risk). DEPENDENT priority orders Aegis after
-        //    glueful/users (IDENTITY) and the app (DEFAULT); source records 'glueful/aegis'.
-        try {
-            $this->loadMigrationsFrom(
-                dirname(__DIR__, 2) . '/migrations',
-                MigrationPriority::DEPENDENT,
-                'glueful/aegis'
-            );
-        } catch (\Throwable $e) {
-            error_log('[Aegis] Failed to register migrations: ' . $e->getMessage());
-        }
+        // 3) Migrations are declared by the composer manifest (extra.glueful.migrations) —
+        //    the container factory is the sole registrar; providers register nothing.
 
         // Permission provider wiring only if RBAC tables exist.
         try {

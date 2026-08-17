@@ -12,7 +12,7 @@
         "php": "^8.3"
     },
     "require-dev": {
-        "glueful/framework": "^1.63.0",
+        "glueful/framework": "^1.79",
         "phpunit/phpunit": "^10.0",
         "phpstan/phpstan": "^1.10"
     },
@@ -46,9 +46,18 @@
             "publisher": "glueful-team",
             "provider": "Glueful\\Extensions\\Aegis\\Services\\AegisServiceProvider",
             "requires": {
-                "glueful": ">=1.63.0",
+                "glueful": ">=1.79.0",
                 "extensions": []
-            }
+            },
+            "migrations": [
+                {
+                    "id": "default",
+                    "path": "migrations",
+                    "priority": "dependent",
+                    "mode": "on_enable",
+                    "verifier": "Glueful\\Extensions\\Aegis\\Schema\\AegisSchemaVerifier"
+                }
+            ]
         }
     },
     "scripts": {
