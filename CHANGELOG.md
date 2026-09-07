@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-09-07
+
+### Changed
+- **Quiet before first run.** The boot-time "RBAC tables not found" warning now prints only
+  on an installed host (framework `InstallState::isInstalled()`: `APP_KEY`, `JWT_KEY` and
+  `TOKEN_SALT` present). On a checkout that has never been provisioned the missing tables are
+  the expected state the installer is about to create, and the warning read as a failure on
+  every first-run command. Once installed, the warning is unchanged — permission checks
+  default-deny until `migrate:run`.
+- Requires `glueful/framework` ^1.82 (for `InstallState::isInstalled()`).
+
 ## [1.15.0] - 2026-08-17
 
 ### Added

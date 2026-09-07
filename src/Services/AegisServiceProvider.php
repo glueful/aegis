@@ -213,14 +213,17 @@ class AegisServiceProvider extends ServiceProvider
         // Permission provider wiring only if RBAC tables exist.
         try {
             if (!$this->tablesExist()) {
-                // Normal on a fresh install before migrations -- but say so loudly, since
-                // until the provider activates, PermissionManager has no provider and every
-                // permission check default-denies (or, worse, an app expecting RBAC silently
-                // gets none). Not fatal: install order is `require` then `migrate:run`.
-                error_log(
-                    '[Aegis] WARNING: RBAC tables not found -- the permission provider is NOT active '
-                    . 'and permission checks will default-deny. Run `php glueful migrate:run` to enable RBAC.'
-                );
+                // On an INSTALLED host this is a real problem: until the provider activates,
+                // PermissionManager has no provider and every permission check default-denies
+                // (or, worse, an app expecting RBAC silently gets none). Not fatal: install order
+                // is `require` then `migrate:run`. Before first run (no security keys yet) it is
+                // simply the expected state — the installer creates these tables — so stay quiet.
+                if (self::shouldWarnAboutMissingRbacTables(base_path($context))) {
+                    error_log(
+                        '[Aegis] WARNING: RBAC tables not found -- the permission provider is NOT active '
+                        . 'and permission checks will default-deny. Run `php glueful migrate:run` to enable RBAC.'
+                    );
+                }
                 return;
             }
 
@@ -271,6 +274,16 @@ class AegisServiceProvider extends ServiceProvider
         $env = $_ENV['APP_ENV'] ?? (getenv('APP_ENV') !== false ? getenv('APP_ENV') : 'production');
 
         return (string) $env === 'production';
+    }
+
+    /**
+     * Missing RBAC tables deserve a warning only once the app has been installed (all three
+     * security keys present — framework `InstallState::isInstalled()`); before that they are the
+     * expected pre-provision state.
+     */
+    public static function shouldWarnAboutMissingRbacTables(string $basePath): bool
+    {
+        return (new \Glueful\Installer\InstallState($basePath))->isInstalled();
     }
 
     private function tablesExist(): bool
