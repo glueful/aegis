@@ -38,6 +38,7 @@ final class AegisSchemaVerifier implements StructuralVerifierInterface
             '001_CreateRolesTables.php',
             '002_CreatePermissionsTables.php',
             '003_SeedDefaultRoles.php',
+            '004_UpdateDefaultRoleDescriptions.php',
         ];
     }
 
@@ -55,6 +56,7 @@ final class AegisSchemaVerifier implements StructuralVerifierInterface
                 'permission_audit' => ['uuid'],
             ]),
             '003_SeedDefaultRoles.php' => $this->seededCatalogPresent($db),
+            '004_UpdateDefaultRoleDescriptions.php' => $this->userRoleReworded($db),
             default => false,
         };
     }
@@ -113,6 +115,20 @@ final class AegisSchemaVerifier implements StructuralVerifierInterface
         $stmt = $db->getPDO()->prepare($sql);
         $stmt->execute([...self::SEEDED_ROLES, ...self::SEEDED_PERMISSIONS]);
         return (int) $stmt->fetchColumn() >= self::SEEDED_ASSIGNMENT_COUNT;
+    }
+
+    /**
+     * 004 rewords the seeded `user` role; it leaves a description an operator already changed
+     * alone, so the proof is "the row exists and no longer carries the original seed text".
+     */
+    private function userRoleReworded(Connection $db): bool
+    {
+        if (!$db->getSchemaBuilder()->hasTable('roles')) {
+            return false;
+        }
+        $row = $db->table('roles')->select(['description'])->where('slug', 'user')->first();
+
+        return $row !== null && (string) ($row['description'] ?? '') !== 'Standard user with basic access';
     }
 
     /** @param list<string> $values */
