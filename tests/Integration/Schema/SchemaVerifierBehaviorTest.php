@@ -97,6 +97,36 @@ final class SchemaVerifierBehaviorTest extends TestCase
         self::assertTrue($this->verifier->verify($this->connection, '003_SeedDefaultRoles.php'));
     }
 
+    public function testRewordProofFlipsWithItsMigration(): void
+    {
+        $this->runMigration('001_CreateRolesTables.php');
+        $this->runMigration('002_CreatePermissionsTables.php');
+        $this->runMigration('003_SeedDefaultRoles.php');
+        // Seed text in place: 004 has not run.
+        self::assertFalse($this->verifier->verify($this->connection, '004_UpdateDefaultRoleDescriptions.php'));
+        $this->runMigration('004_UpdateDefaultRoleDescriptions.php');
+        self::assertTrue($this->verifier->verify($this->connection, '004_UpdateDefaultRoleDescriptions.php'));
+        self::assertSame('An individual with an account on the platform.', $this->userRoleDescription());
+    }
+
+    public function testRewordLeavesAnOperatorEditAloneAndStillCountsAsApplied(): void
+    {
+        $this->runMigration('001_CreateRolesTables.php');
+        $this->runMigration('002_CreatePermissionsTables.php');
+        $this->runMigration('003_SeedDefaultRoles.php');
+        $this->connection->getPDO()->exec("UPDATE roles SET description = 'Our customers' WHERE slug = 'user'");
+        $this->runMigration('004_UpdateDefaultRoleDescriptions.php');
+        self::assertSame('Our customers', $this->userRoleDescription());
+        self::assertTrue($this->verifier->verify($this->connection, '004_UpdateDefaultRoleDescriptions.php'));
+    }
+
+    private function userRoleDescription(): string
+    {
+        $row = $this->connection->table('roles')->select(['description'])->where('slug', 'user')->first();
+
+        return (string) ($row['description'] ?? '');
+    }
+
     public function testUnknownBasenameIsNeverAdoptable(): void
     {
         self::assertFalse($this->verifier->verify($this->connection, '999_Unknown.php'));

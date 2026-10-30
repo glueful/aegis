@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-10-30
+### Changed
+- The seeded `user` role now reads "An individual with an account on the platform." instead of
+  "Standard user with basic access". Shipped as migration `004_UpdateDefaultRoleDescriptions`, which
+  rewords the existing row only while it still carries the original seed text, so a description an
+  operator changed is left alone. `003_SeedDefaultRoles` is untouched to keep its checksum.
+
 ## [1.16.0] - 2026-09-07
 
 ### Changed
